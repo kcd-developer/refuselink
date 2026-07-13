@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Truck, Mail, Phone, MapPin } from 'lucide-react'
+import { Truck, Mail, MapPin } from 'lucide-react'
 import { ContactForm } from './contact-form'
 
 export default function ContactPage() {
@@ -37,15 +37,13 @@ export default function ContactPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-sm text-slate-600">
                     <Mail className="h-4 w-4 text-blue-600" />
-                    <span>sales@refuselink.com</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-600">
-                    <Phone className="h-4 w-4 text-blue-600" />
-                    <span>(888) 555-LINK</span>
+                    <a href="mailto:sales@refuselink.com" className="hover:text-blue-600">
+                      sales@refuselink.com
+                    </a>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-slate-600">
                     <MapPin className="h-4 w-4 text-blue-600" />
-                    <span>Kansas City, MO</span>
+                    <span>Kansas City, KS</span>
                   </div>
                 </div>
               </div>

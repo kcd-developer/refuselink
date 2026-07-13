@@ -4,23 +4,29 @@ import { useState } from 'react'
 import { Send } from 'lucide-react'
 
 export function ContactForm() {
-  const [form, setForm] = useState({ name: '', email: '', company: '', message: '' })
+  const [form, setForm] = useState({ name: '', email: '', company: '', message: '', website: '' })
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
+    setError('')
     try {
-      await fetch('/api/contact', {
+      const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(result?.error || 'We could not send your message. Please try again.')
+      }
       setSuccess(true)
-      setForm({ name: '', email: '', company: '', message: '' })
-    } catch {
-      // silently handle
+      setForm({ name: '', email: '', company: '', message: '', website: '' })
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : 'We could not send your message. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -36,6 +42,18 @@ export function ContactForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor="website">Website</label>
+        <input
+          id="website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={form.website}
+          onChange={(e) => setForm({ ...form, website: e.target.value })}
+        />
+      </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1.5">Name</label>
         <input
@@ -79,6 +97,11 @@ export function ContactForm() {
         <Send className="h-4 w-4" />
         {submitting ? 'Sending...' : 'Send Message'}
       </button>
+      {error && (
+        <p role="alert" className="text-sm text-red-600 text-center">
+          {error}
+        </p>
+      )}
     </form>
   )
 }
