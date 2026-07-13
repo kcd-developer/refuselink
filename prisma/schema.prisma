@@ -1,0 +1,372 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
+}
+
+model PlatformUser {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  password  String
+  name      String
+  role      PlatformRole
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+enum PlatformRole {
+  platform_owner
+  platform_admin
+  platform_support
+  platform_sales
+}
+
+model Plan {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  monthlyPriceCents Int
+  annualPriceCents  Int
+  maxCommunities    Int?
+  maxCustomers      Int?
+  maxStaffUsers     Int?
+  features          Json     @default("{}")
+  isActive          Boolean  @default(true)
+  displayOrder      Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  subscriptions     Subscription[]
+}
+
+model Company {
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  code             String            @unique
+  status           CompanyStatus     @default(trial)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  branding         CompanyBranding?
+  subscription     Subscription?
+  employees        CompanyUser[]
+  cities           City[]
+  communities      Community[]
+  customers        Customer[]
+  announcements    Announcement[]
+  documents        Document[]
+  serviceSchedules ServiceSchedule[]
+  tickets          Ticket[]
+  auditLogs        AuditLog[]
+}
+
+enum CompanyStatus {
+  trial
+  active
+  suspended
+  cancelled
+}
+
+model CompanyBranding {
+  id             String   @id @default(cuid())
+  companyId      String   @unique
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  logoUrl        String?
+  primaryColor   String   @default("#0F172A")
+  secondaryColor String   @default("#3B82F6")
+  supportPhone   String?
+  supportEmail   String?
+  website        String?
+  updatedAt      DateTime @updatedAt
+}
+
+model Subscription {
+  id           String             @id @default(cuid())
+  companyId    String             @unique
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId       String
+  plan         Plan               @relation(fields: [planId], references: [id])
+  billingCycle BillingCycle       @default(monthly)
+  status       SubscriptionStatus @default(trial)
+  startDate    DateTime
+  endDate      DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+enum BillingCycle {
+  monthly
+  annual
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  past_due
+  cancelled
+}
+
+model CompanyUser {
+  id              String      @id @default(cuid())
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email           String
+  password        String
+  name            String
+  role            CompanyRole
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  assignedTickets Ticket[]    @relation("AssignedTickets")
+
+  @@unique([companyId, email])
+}
+
+enum CompanyRole {
+  company_owner
+  company_admin
+  company_manager
+  csr
+  dispatcher
+}
+
+model City {
+  id          String      @id @default(cuid())
+  companyId   String
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  state       String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  communities Community[]
+  customers   Customer[]
+
+  @@unique([companyId, name, state])
+}
+
+model Community {
+  id        String     @id @default(cuid())
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cityId    String
+  city      City       @relation(fields: [cityId], references: [id])
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  customers Customer[]
+}
+
+model Customer {
+  id            String               @id @default(cuid())
+  companyId     String
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type          CustomerType
+  accountNumber String?
+  name          String
+  contactName   String?
+  email         String?
+  phone         String?
+  address       String?
+  address2      String?
+  city          String?
+  state         String?
+  zipCode       String?
+  cityId        String?
+  cityRef       City?                @relation(fields: [cityId], references: [id])
+  communityId   String?
+  community     Community?           @relation(fields: [communityId], references: [id])
+  notes         String?
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  userAccess    CustomerUserAccess[]
+  tickets       Ticket[]
+}
+
+enum CustomerType {
+  residential
+  commercial
+  roll_off
+}
+
+model CustomerUser {
+  id        String               @id @default(cuid())
+  email     String               @unique
+  password  String
+  name      String
+  phone     String?
+  isActive  Boolean              @default(true)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  accounts  CustomerUserAccess[]
+}
+
+model CustomerUserAccess {
+  id             String       @id @default(cuid())
+  customerUserId String
+  customerUser   CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  isPrimary      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@unique([customerUserId, customerId])
+}
+
+model Announcement {
+  id                 String               @id @default(cuid())
+  companyId          String
+  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title              String
+  content            String
+  priority           AnnouncementPriority @default(normal)
+  startDate          DateTime
+  endDate            DateTime?
+  isPublished        Boolean              @default(false)
+  targetAll          Boolean              @default(true)
+  targetTypes        CustomerType[]
+  targetCityIds      String[]
+  targetCommunityIds String[]
+  createdById        String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+enum AnnouncementPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+model Document {
+  id                 String         @id @default(cuid())
+  companyId          String
+  company            Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  fileUrl            String
+  fileName           String
+  fileSize           Int
+  mimeType           String
+  targetAll          Boolean        @default(true)
+  targetTypes        CustomerType[]
+  targetCityIds      String[]
+  targetCommunityIds String[]
+  isPublished        Boolean        @default(true)
+  createdById        String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model ServiceSchedule {
+  id          String              @id @default(cuid())
+  companyId   String
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  type        CustomerType
+  frequency   ScheduleFrequency
+  daysOfWeek  Int[]
+  cityId      String?
+  communityId String?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  exceptions  ScheduleException[]
+}
+
+enum ScheduleFrequency {
+  weekly
+  biweekly
+  monthly
+}
+
+model ScheduleException {
+  id                String          @id @default(cuid())
+  serviceScheduleId String
+  serviceSchedule   ServiceSchedule @relation(fields: [serviceScheduleId], references: [id], onDelete: Cascade)
+  date              DateTime
+  reason            String?
+  alternateDate     DateTime?
+  createdAt         DateTime        @default(now())
+}
+
+model Ticket {
+  id            String         @id @default(cuid())
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  ticketNumber  String
+  subject       String
+  status        TicketStatus   @default(open)
+  priority      TicketPriority @default(normal)
+  assignedToId  String?
+  assignedTo    CompanyUser?   @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  createdById   String
+  createdByType String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  messages      TicketMessage[]
+
+  @@unique([companyId, ticketNumber])
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  waiting_on_customer
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+model TicketMessage {
+  id          String             @id @default(cuid())
+  ticketId    String
+  ticket      Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content     String
+  authorId    String
+  authorType  String
+  authorName  String
+  isInternal  Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  attachments TicketAttachment[]
+}
+
+model TicketAttachment {
+  id              String        @id @default(cuid())
+  ticketMessageId String
+  ticketMessage   TicketMessage @relation(fields: [ticketMessageId], references: [id], onDelete: Cascade)
+  fileUrl         String
+  fileName        String
+  fileSize        Int
+  mimeType        String
+  createdAt       DateTime      @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  companyId  String?
+  company    Company? @relation(fields: [companyId], references: [id])
+  actorId    String
+  actorType  String
+  actorName  String
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
