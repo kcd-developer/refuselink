@@ -1,11 +1,11 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider  = "postgresql"
-    url       = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model PlatformUser {
@@ -27,19 +27,19 @@ enum PlatformRole {
 }
 
 model Plan {
-  id                String   @id @default(cuid())
+  id                String         @id @default(cuid())
   name              String
-  slug              String   @unique
+  slug              String         @unique
   monthlyPriceCents Int
   annualPriceCents  Int
   maxCommunities    Int?
   maxCustomers      Int?
   maxStaffUsers     Int?
-  features          Json     @default("{}")
-  isActive          Boolean  @default(true)
-  displayOrder      Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  features          Json           @default("{}")
+  isActive          Boolean        @default(true)
+  displayOrder      Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
   subscriptions     Subscription[]
 }
 
@@ -56,6 +56,7 @@ model Company {
   employees        CompanyUser[]
   cities           City[]
   communities      Community[]
+  addresses        Address[]
   customers        Customer[]
   announcements    Announcement[]
   documents        Document[]
@@ -143,6 +144,7 @@ model City {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   communities Community[]
+  addresses   Address[]
   customers   Customer[]
 
   @@unique([companyId, name, state])
@@ -157,7 +159,27 @@ model Community {
   name      String
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  addresses Address[]
   customers Customer[]
+}
+
+model Address {
+  id          String     @id @default(cuid())
+  companyId   String
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  address     String
+  address2    String?
+  cityId      String
+  city        City       @relation(fields: [cityId], references: [id])
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  zipCode     String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([companyId])
+  @@index([cityId])
+  @@index([communityId])
 }
 
 model Customer {
@@ -297,21 +319,21 @@ model ScheduleException {
 }
 
 model Ticket {
-  id            String         @id @default(cuid())
+  id            String          @id @default(cuid())
   companyId     String
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customerId    String
-  customer      Customer       @relation(fields: [customerId], references: [id])
+  customer      Customer        @relation(fields: [customerId], references: [id])
   ticketNumber  String
   subject       String
-  status        TicketStatus   @default(open)
-  priority      TicketPriority @default(normal)
+  status        TicketStatus    @default(open)
+  priority      TicketPriority  @default(normal)
   assignedToId  String?
-  assignedTo    CompanyUser?   @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  assignedTo    CompanyUser?    @relation("AssignedTickets", fields: [assignedToId], references: [id])
   createdById   String
   createdByType String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   messages      TicketMessage[]
 
   @@unique([companyId, ticketNumber])

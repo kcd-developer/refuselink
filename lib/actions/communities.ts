@@ -51,9 +51,9 @@ export async function deleteCommunity(companySlug: string, communityId: string) 
   if (!user || user.userType !== 'employee' || user.companySlug !== companySlug) return { error: 'Unauthorized' }
   if (!['company_owner', 'company_admin'].includes(user.role ?? '')) return { error: 'Insufficient permissions' }
   try {
-    const comm = await prisma.community.findUnique({ where: { id: communityId, companyId: user.companyId! }, include: { _count: { select: { customers: true } } } })
+    const comm = await prisma.community.findUnique({ where: { id: communityId, companyId: user.companyId! }, include: { _count: { select: { customers: true, addresses: true } } } })
     if (!comm) return { error: 'Community not found' }
-    if ((comm._count?.customers ?? 0) > 0) return { error: 'Cannot delete community with associated customers' }
+    if ((comm._count?.customers ?? 0) > 0 || (comm._count?.addresses ?? 0) > 0) return { error: 'Cannot delete community with associated customers or addresses' }
     await prisma.community.delete({ where: { id: communityId } })
     revalidatePath(`/${companySlug}/communities`)
     return { success: true }

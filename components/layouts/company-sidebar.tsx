@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
-  LayoutDashboard, Users, MapPin, Building, Megaphone,
+  LayoutDashboard, Users, MapPin, Map, Building, Megaphone,
   FileText, Calendar, Ticket, UserCog, Settings, LogOut,
   ChevronLeft, ChevronRight
 } from 'lucide-react'
@@ -26,6 +26,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
   const navItems = [
     { href: `/${companySlug}/dashboard`, label: 'Dashboard', icon: LayoutDashboard, roles: ['company_owner', 'company_admin', 'company_manager', 'csr', 'dispatcher'] },
     { href: `/${companySlug}/customers`, label: 'Customers', icon: Users, roles: ['company_owner', 'company_admin', 'company_manager', 'csr', 'dispatcher'] },
+    { href: `/${companySlug}/addresses`, label: 'Addresses', icon: Map, roles: ['company_owner', 'company_admin', 'company_manager'] },
     { href: `/${companySlug}/cities`, label: 'Cities', icon: MapPin, roles: ['company_owner', 'company_admin', 'company_manager'] },
     { href: `/${companySlug}/communities`, label: 'Communities', icon: Building, roles: ['company_owner', 'company_admin', 'company_manager'] },
     { href: `/${companySlug}/announcements`, label: 'Announcements', icon: Megaphone, roles: ['company_owner', 'company_admin', 'company_manager', 'csr'] },

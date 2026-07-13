@@ -188,6 +188,21 @@ CREATE TABLE "Customer" (
 );
 
 -- CreateTable
+CREATE TABLE "Address" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "address" TEXT NOT NULL,
+    "address2" TEXT,
+    "cityId" TEXT NOT NULL,
+    "communityId" TEXT,
+    "zipCode" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Address_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "CustomerUser" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -375,6 +390,15 @@ CREATE UNIQUE INDEX "City_companyId_name_state_key" ON "City"("companyId", "name
 CREATE UNIQUE INDEX "CustomerUser_email_key" ON "CustomerUser"("email");
 
 -- CreateIndex
+CREATE INDEX "Address_companyId_idx" ON "Address"("companyId");
+
+-- CreateIndex
+CREATE INDEX "Address_cityId_idx" ON "Address"("cityId");
+
+-- CreateIndex
+CREATE INDEX "Address_communityId_idx" ON "Address"("communityId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "CustomerUserAccess_customerUserId_customerId_key" ON "CustomerUserAccess"("customerUserId", "customerId");
 
 -- CreateIndex
@@ -411,6 +435,15 @@ ALTER TABLE "Customer" ADD CONSTRAINT "Customer_cityId_fkey" FOREIGN KEY ("cityI
 ALTER TABLE "Customer" ADD CONSTRAINT "Customer_communityId_fkey" FOREIGN KEY ("communityId") REFERENCES "Community"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Address" ADD CONSTRAINT "Address_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Address" ADD CONSTRAINT "Address_cityId_fkey" FOREIGN KEY ("cityId") REFERENCES "City"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Address" ADD CONSTRAINT "Address_communityId_fkey" FOREIGN KEY ("communityId") REFERENCES "Community"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "CustomerUserAccess" ADD CONSTRAINT "CustomerUserAccess_customerUserId_fkey" FOREIGN KEY ("customerUserId") REFERENCES "CustomerUser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -445,4 +478,3 @@ ALTER TABLE "TicketAttachment" ADD CONSTRAINT "TicketAttachment_ticketMessageId_
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-

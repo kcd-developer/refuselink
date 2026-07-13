@@ -60,9 +60,9 @@ export async function deleteCity(companySlug: string, cityId: string) {
   if (!user || user.userType !== 'employee' || user.companySlug !== companySlug) return { error: 'Unauthorized' }
   if (!['company_owner', 'company_admin'].includes(user.role ?? '')) return { error: 'Insufficient permissions' }
   try {
-    const city = await prisma.city.findUnique({ where: { id: cityId, companyId: user.companyId! }, include: { _count: { select: { communities: true, customers: true } } } })
+    const city = await prisma.city.findUnique({ where: { id: cityId, companyId: user.companyId! }, include: { _count: { select: { communities: true, customers: true, addresses: true } } } })
     if (!city) return { error: 'City not found' }
-    if ((city._count?.communities ?? 0) > 0 || (city._count?.customers ?? 0) > 0) return { error: 'Cannot delete city with associated communities or customers' }
+    if ((city._count?.communities ?? 0) > 0 || (city._count?.customers ?? 0) > 0 || (city._count?.addresses ?? 0) > 0) return { error: 'Cannot delete city with associated communities, customers, or addresses' }
     await prisma.city.delete({ where: { id: cityId } })
     await createAuditLog({ companyId: user.companyId, actorId: user.id, actorType: 'employee', actorName: user.name, action: 'delete', entityType: 'city', entityId: cityId })
     revalidatePath(`/${companySlug}/cities`)

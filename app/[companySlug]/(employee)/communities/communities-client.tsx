@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Building, Plus, Pencil, Trash2, X } from 'lucide-react'
 import { createCommunity, updateCommunity, deleteCommunity } from '@/lib/actions/communities'
 
-interface Community { id: string; name: string; cityId: string; city: { name: string; state: string }; _count: { customers: number } }
+interface Community { id: string; name: string; cityId: string; city: { name: string; state: string }; _count: { customers: number; addresses: number } }
 interface City { id: string; name: string; state: string }
 
 export function CommunitiesClient({ communities, companySlug, cities }: { communities: Community[]; companySlug: string; cities: City[] }) {
@@ -83,7 +83,7 @@ export function CommunitiesClient({ communities, companySlug, cities }: { commun
                 <button onClick={() => handleDelete(c.id)} className="p-1.5 hover:bg-red-50 rounded-md"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button>
               </div>
             </div>
-            <div className="mt-4 text-xs text-slate-500">{c._count.customers} customers</div>
+            <div className="mt-4 text-xs text-slate-500">{c._count.customers} customers · {c._count.addresses} addresses</div>
           </div>
         ))}
         {communities.length === 0 && <p className="text-slate-400 text-sm col-span-full py-12 text-center">No communities added yet</p>}

@@ -14,7 +14,7 @@ export default async function CommunitiesPage({ params }: { params: Promise<{ co
   const [communities, cities] = await Promise.all([
     prisma.community.findMany({
       where: { companyId: user.companyId! },
-      include: { city: { select: { name: true, state: true } }, _count: { select: { customers: true } } },
+      include: { city: { select: { name: true, state: true } }, _count: { select: { customers: true, addresses: true } } },
       orderBy: { name: 'asc' },
     }),
     prisma.city.findMany({
