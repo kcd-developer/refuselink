@@ -5,10 +5,11 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 
-export async function PATCH(req: Request, { params }: { params: { companySlug: string; id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ companySlug: string; id: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee' || user.companySlug !== params.companySlug) {
+  if (!user || user.userType !== 'employee' || user.companySlug !== resolvedParams.companySlug) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -19,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: { companySlug: s
   if (body?.priority) data.priority = body.priority
 
   const ticket = await prisma.ticket.updateMany({
-    where: { id: params.id, companyId: user.companyId ?? '' },
+    where: { id: resolvedParams.id, companyId: user.companyId ?? '' },
     data,
   })
 
@@ -30,7 +31,7 @@ export async function PATCH(req: Request, { params }: { params: { companySlug: s
     actorName: user.name,
     action: 'ticket_update',
     entityType: 'Ticket',
-    entityId: params.id,
+    entityId: resolvedParams.id,
     metadata: data,
   })
 

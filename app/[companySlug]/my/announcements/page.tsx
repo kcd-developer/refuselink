@@ -5,10 +5,11 @@ import { Megaphone, AlertTriangle, Info, AlertCircle } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CustomerAnnouncementsPage({ params }: { params: { companySlug: string } }) {
+export default async function CustomerAnnouncementsPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const announcements = await prisma.announcement.findMany({
     where: { companyId: user.companyId ?? '', isPublished: true },

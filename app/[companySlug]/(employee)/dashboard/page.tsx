@@ -5,10 +5,11 @@ import { DashboardClient } from './dashboard-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function EmployeeDashboardPage({ params }: { params: { companySlug: string } }) {
+export default async function EmployeeDashboardPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const companyId = user.companyId ?? ''
 
@@ -40,7 +41,7 @@ export default async function EmployeeDashboardPage({ params }: { params: { comp
   return (
     <DashboardClient
       userName={user.name ?? 'User'}
-      companySlug={params.companySlug}
+      companySlug={resolvedParams.companySlug}
       ticketsByStatus={ticketsByStatus}
       customerCount={customerCount ?? 0}
       recentTickets={JSON.parse(JSON.stringify(recentTickets ?? []))}

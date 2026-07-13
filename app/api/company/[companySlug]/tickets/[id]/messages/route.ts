@@ -4,13 +4,14 @@ import { NextResponse } from 'next/server'
 import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
 
-export async function POST(req: Request, { params }: { params: { companySlug: string; id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ companySlug: string; id: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const ticket = await prisma.ticket.findFirst({
-    where: { id: params.id, companyId: user.companyId ?? '' },
+    where: { id: resolvedParams.id, companyId: user.companyId ?? '' },
   })
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 

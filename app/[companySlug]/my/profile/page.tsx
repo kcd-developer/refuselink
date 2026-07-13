@@ -5,10 +5,11 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
 
-export default async function ProfilePage({ params }: { params: { companySlug: string } }) {
+export default async function ProfilePage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer' || user.companySlug !== params.companySlug) redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer' || user.companySlug !== resolvedParams.companySlug) redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const customerUser = await prisma.customerUser.findUnique({
     where: { id: user.id },
@@ -23,7 +24,7 @@ export default async function ProfilePage({ params }: { params: { companySlug: s
     }
   })
 
-  if (!customerUser) redirect(`/${params.companySlug}/sign-in`)
+  if (!customerUser) redirect(`/${resolvedParams.companySlug}/sign-in`)
 
-  return <ProfileClient customerUser={customerUser as any} companySlug={params.companySlug} />
+  return <ProfileClient customerUser={customerUser as any} companySlug={resolvedParams.companySlug} />
 }

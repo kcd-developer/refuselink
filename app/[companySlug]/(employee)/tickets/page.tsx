@@ -5,10 +5,11 @@ import { TicketsClient } from './tickets-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TicketsPage({ params }: { params: { companySlug: string } }) {
+export default async function TicketsPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const tickets = await prisma.ticket.findMany({
     where: { companyId: user.companyId ?? '' },
@@ -19,5 +20,5 @@ export default async function TicketsPage({ params }: { params: { companySlug: s
     orderBy: { updatedAt: 'desc' },
   })
 
-  return <TicketsClient tickets={JSON.parse(JSON.stringify(tickets ?? []))} companySlug={params.companySlug} />
+  return <TicketsClient tickets={JSON.parse(JSON.stringify(tickets ?? []))} companySlug={resolvedParams.companySlug} />
 }

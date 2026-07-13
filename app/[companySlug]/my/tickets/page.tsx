@@ -5,10 +5,11 @@ import { CustomerTicketsClient } from './tickets-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CustomerTicketsPage({ params }: { params: { companySlug: string } }) {
+export default async function CustomerTicketsPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const access = await prisma.customerUserAccess.findMany({
     where: { customerUserId: user.id },
@@ -25,7 +26,7 @@ export default async function CustomerTicketsPage({ params }: { params: { compan
   return (
     <CustomerTicketsClient
       tickets={JSON.parse(JSON.stringify(tickets ?? []))}
-      companySlug={params.companySlug}
+      companySlug={resolvedParams.companySlug}
       customerIds={customerIds}
     />
   )

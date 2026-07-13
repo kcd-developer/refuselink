@@ -5,10 +5,11 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { CustomersClient } from './customers-client'
 
-export default async function CustomersPage({ params }: { params: { companySlug: string } }) {
+export default async function CustomersPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee' || user.companySlug !== params.companySlug) redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee' || user.companySlug !== resolvedParams.companySlug) redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const [customers, cities, communities] = await Promise.all([
     prisma.customer.findMany({
@@ -20,5 +21,5 @@ export default async function CustomersPage({ params }: { params: { companySlug:
     prisma.community.findMany({ where: { companyId: user.companyId! }, select: { id: true, name: true, cityId: true }, orderBy: { name: 'asc' } }),
   ])
 
-  return <CustomersClient customers={customers as any} companySlug={params.companySlug} cities={cities} communities={communities} />
+  return <CustomersClient customers={customers as any} companySlug={resolvedParams.companySlug} cities={cities} communities={communities} />
 }

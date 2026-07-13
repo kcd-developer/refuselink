@@ -5,13 +5,14 @@ import { TicketDetailClient } from './ticket-detail-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TicketDetailPage({ params }: { params: { companySlug: string; id: string } }) {
+export default async function TicketDetailPage({ params }: { params: Promise<{ companySlug: string; id: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const ticket = await prisma.ticket.findFirst({
-    where: { id: params.id, companyId: user.companyId ?? '' },
+    where: { id: resolvedParams.id, companyId: user.companyId ?? '' },
     include: {
       customer: true,
       assignedTo: { select: { id: true, name: true } },
@@ -33,7 +34,7 @@ export default async function TicketDetailPage({ params }: { params: { companySl
     <TicketDetailClient
       ticket={JSON.parse(JSON.stringify(ticket))}
       employees={JSON.parse(JSON.stringify(employees ?? []))}
-      companySlug={params.companySlug}
+      companySlug={resolvedParams.companySlug}
       currentUserId={user.id}
       currentUserName={user.name}
     />

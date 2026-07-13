@@ -4,9 +4,10 @@ import { CompanyDetailClient } from './company-detail-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CompanyDetailPage({ params }: { params: { id: string } }) {
+export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
   const company = await prisma.company.findUnique({
-    where: { id: params.id },
+    where: { id: resolvedParams.id },
     include: {
       branding: true,
       subscription: { include: { plan: true } },

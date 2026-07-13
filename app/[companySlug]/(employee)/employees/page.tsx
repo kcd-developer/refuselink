@@ -5,11 +5,12 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { EmployeesClient } from './employees-client'
 
-export default async function EmployeesPage({ params }: { params: { companySlug: string } }) {
+export default async function EmployeesPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee' || user.companySlug !== params.companySlug) redirect(`/${params.companySlug}/sign-in`)
-  if (!['company_owner', 'company_admin'].includes(user.role ?? '')) redirect(`/${params.companySlug}/dashboard`)
+  if (!user || user.userType !== 'employee' || user.companySlug !== resolvedParams.companySlug) redirect(`/${resolvedParams.companySlug}/sign-in`)
+  if (!['company_owner', 'company_admin'].includes(user.role ?? '')) redirect(`/${resolvedParams.companySlug}/dashboard`)
 
   const employees = await prisma.companyUser.findMany({
     where: { companyId: user.companyId! },
@@ -17,5 +18,5 @@ export default async function EmployeesPage({ params }: { params: { companySlug:
     orderBy: { name: 'asc' },
   })
 
-  return <EmployeesClient employees={employees as any} companySlug={params.companySlug} currentUserRole={user.role ?? ''} />
+  return <EmployeesClient employees={employees as any} companySlug={resolvedParams.companySlug} currentUserRole={user.role ?? ''} />
 }

@@ -7,10 +7,11 @@ export const dynamic = 'force-dynamic'
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-export default async function CustomerSchedulesPage({ params }: { params: { companySlug: string } }) {
+export default async function CustomerSchedulesPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const schedules = await prisma.serviceSchedule.findMany({
     where: { companyId: user.companyId ?? '', isActive: true },

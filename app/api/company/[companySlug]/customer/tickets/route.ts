@@ -5,10 +5,11 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
 import { generateTicketNumber } from '@/lib/ticket-number'
 
-export async function POST(req: Request, { params }: { params: { companySlug: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer' || user.companySlug !== params.companySlug) {
+  if (!user || user.userType !== 'customer' || user.companySlug !== resolvedParams.companySlug) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

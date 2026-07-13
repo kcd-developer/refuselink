@@ -8,10 +8,11 @@ export default async function CompanyLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { companySlug: string }
+  params: Promise<{ companySlug: string }>
 }) {
+  const resolvedParams = await params
   const company = await prisma.company.findUnique({
-    where: { slug: params.companySlug },
+    where: { slug: resolvedParams.companySlug },
     include: { branding: true },
   })
 

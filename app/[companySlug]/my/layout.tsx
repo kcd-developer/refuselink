@@ -10,24 +10,25 @@ export default async function CustomerLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { companySlug: string }
+  params: Promise<{ companySlug: string }>
 }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
 
-  if (!user || user.userType !== 'customer' || user.companySlug !== params.companySlug) {
-    redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer' || user.companySlug !== resolvedParams.companySlug) {
+    redirect(`/${resolvedParams.companySlug}/sign-in`)
   }
 
   const company = await prisma.company.findUnique({
-    where: { slug: params.companySlug },
+    where: { slug: resolvedParams.companySlug },
     include: { branding: true },
   })
 
   return (
     <div className="min-h-screen bg-slate-50">
       <CustomerNav
-        companySlug={params.companySlug}
+        companySlug={resolvedParams.companySlug}
         companyName={company?.name ?? 'Company'}
         primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
         userName={user.name}

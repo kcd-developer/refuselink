@@ -5,10 +5,11 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { CommunitiesClient } from './communities-client'
 
-export default async function CommunitiesPage({ params }: { params: { companySlug: string } }) {
+export default async function CommunitiesPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee' || user.companySlug !== params.companySlug) redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee' || user.companySlug !== resolvedParams.companySlug) redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const [communities, cities] = await Promise.all([
     prisma.community.findMany({
@@ -23,5 +24,5 @@ export default async function CommunitiesPage({ params }: { params: { companySlu
     }),
   ])
 
-  return <CommunitiesClient communities={communities as any} companySlug={params.companySlug} cities={cities} />
+  return <CommunitiesClient communities={communities as any} companySlug={resolvedParams.companySlug} cities={cities} />
 }

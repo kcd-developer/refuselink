@@ -5,10 +5,11 @@ import { FileText } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CustomerDocumentsPage({ params }: { params: { companySlug: string } }) {
+export default async function CustomerDocumentsPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const documents = await prisma.document.findMany({
     where: { companyId: user.companyId ?? '', isPublished: true },

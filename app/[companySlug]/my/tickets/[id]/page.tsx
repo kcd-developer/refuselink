@@ -5,10 +5,11 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { redirect, notFound } from 'next/navigation'
 import { CustomerTicketDetailClient } from './ticket-detail-client'
 
-export default async function CustomerTicketDetailPage({ params }: { params: { companySlug: string; id: string } }) {
+export default async function CustomerTicketDetailPage({ params }: { params: Promise<{ companySlug: string; id: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer' || user.companySlug !== params.companySlug) redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer' || user.companySlug !== resolvedParams.companySlug) redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   // Get customer's accessible account IDs
   const access = await prisma.customerUserAccess.findMany({
@@ -18,7 +19,7 @@ export default async function CustomerTicketDetailPage({ params }: { params: { c
   const customerIds = access.map(a => a.customerId)
 
   const ticket = await prisma.ticket.findUnique({
-    where: { id: params.id, companyId: user.companyId! },
+    where: { id: resolvedParams.id, companyId: user.companyId! },
     include: {
       customer: { select: { name: true } },
       messages: {
@@ -31,5 +32,5 @@ export default async function CustomerTicketDetailPage({ params }: { params: { c
 
   if (!ticket || !customerIds.includes(ticket.customerId)) return notFound()
 
-  return <CustomerTicketDetailClient ticket={ticket as any} companySlug={params.companySlug} />
+  return <CustomerTicketDetailClient ticket={ticket as any} companySlug={resolvedParams.companySlug} />
 }

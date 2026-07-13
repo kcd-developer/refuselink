@@ -10,24 +10,25 @@ export default async function EmployeeLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { companySlug: string }
+  params: Promise<{ companySlug: string }>
 }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
 
-  if (!user || user.userType !== 'employee' || user.companySlug !== params.companySlug) {
-    redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee' || user.companySlug !== resolvedParams.companySlug) {
+    redirect(`/${resolvedParams.companySlug}/sign-in`)
   }
 
   const company = await prisma.company.findUnique({
-    where: { slug: params.companySlug },
+    where: { slug: resolvedParams.companySlug },
     include: { branding: true },
   })
 
   return (
     <div className="flex min-h-screen bg-slate-50">
       <CompanySidebar
-        companySlug={params.companySlug}
+        companySlug={resolvedParams.companySlug}
         companyName={company?.name ?? 'Company'}
         primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
       />

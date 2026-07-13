@@ -5,13 +5,14 @@ import { SettingsClient } from './settings-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SettingsPage({ params }: { params: { companySlug: string } }) {
+export default async function SettingsPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'employee') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'employee') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   if (!['company_owner', 'company_admin'].includes(user.role ?? '')) {
-    redirect(`/${params.companySlug}/dashboard`)
+    redirect(`/${resolvedParams.companySlug}/dashboard`)
   }
 
   const company = await prisma.company.findUnique({
@@ -19,5 +20,5 @@ export default async function SettingsPage({ params }: { params: { companySlug: 
     include: { branding: true, subscription: { include: { plan: true } } },
   })
 
-  return <SettingsClient company={JSON.parse(JSON.stringify(company))} companySlug={params.companySlug} />
+  return <SettingsClient company={JSON.parse(JSON.stringify(company))} companySlug={resolvedParams.companySlug} />
 }

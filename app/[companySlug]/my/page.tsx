@@ -5,13 +5,14 @@ import { CustomerDashboardClient } from './dashboard-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CustomerDashboardPage({ params }: { params: { companySlug: string } }) {
+export default async function CustomerDashboardPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer') redirect(`/${params.companySlug}/sign-in`)
+  if (!user || user.userType !== 'customer') redirect(`/${resolvedParams.companySlug}/sign-in`)
 
   const company = await prisma.company.findUnique({
-    where: { slug: params.companySlug },
+    where: { slug: resolvedParams.companySlug },
     include: { branding: true },
   })
 
@@ -48,7 +49,7 @@ export default async function CustomerDashboardPage({ params }: { params: { comp
   return (
     <CustomerDashboardClient
       userName={user.name}
-      companySlug={params.companySlug}
+      companySlug={resolvedParams.companySlug}
       primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
       accounts={JSON.parse(JSON.stringify(access ?? []))}
       openTickets={openTickets ?? 0}

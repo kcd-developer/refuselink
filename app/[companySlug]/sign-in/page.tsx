@@ -4,9 +4,10 @@ import { CompanySignInForm } from './sign-in-form'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CompanySignInPage({ params }: { params: { companySlug: string } }) {
+export default async function CompanySignInPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const resolvedParams = await params
   const company = await prisma.company.findUnique({
-    where: { slug: params.companySlug },
+    where: { slug: resolvedParams.companySlug },
     include: { branding: true },
   })
 

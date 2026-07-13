@@ -5,7 +5,8 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
   const session = await getSession()
   const user = getSessionUser(session)
   if (!user || user.userType !== 'platform') {
@@ -16,7 +17,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { status } = body ?? {}
 
   const company = await prisma.company.update({
-    where: { id: params.id },
+    where: { id: resolvedParams.id },
     data: { status },
   })
 
