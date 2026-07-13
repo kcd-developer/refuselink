@@ -1,14 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Building2, Users, MapPin, Ticket, Save, Ban, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Building2, Users, MapPin, Ticket, Save, Ban, CheckCircle, Copy, Check } from 'lucide-react'
 import Link from 'next/link'
 
 export function CompanyDetailClient({ company, plans }: { company: any; plans: any[] }) {
   const router = useRouter()
   const [status, setStatus] = useState(company?.status ?? 'trial')
   const [saving, setSaving] = useState(false)
+  const [portalUrl, setPortalUrl] = useState(`/${company?.slug ?? ''}/sign-in`)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    setPortalUrl(`${window.location.origin}/${company?.slug ?? ''}/sign-in`)
+  }, [company?.slug])
+
+  const copyPortalUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(portalUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
 
   const handleStatusChange = async (newStatus: string) => {
     setSaving(true)
@@ -47,7 +63,24 @@ export function CompanyDetailClient({ company, plans }: { company: any; plans: a
           </div>
           <div>
             <h1 className="font-display text-2xl font-bold text-slate-900">{company?.name ?? 'Company'}</h1>
-            <p className="text-sm text-slate-500">Slug: {company?.slug ?? ''} · Code: {company?.code ?? ''}</p>
+            <div className="flex items-center gap-1 text-sm text-slate-500 whitespace-nowrap">
+              <span>Slug: {company?.slug ?? ''}</span>
+              <span>·</span>
+              <span>Code: {company?.code ?? ''}</span>
+              <span>·</span>
+              <span>Portal:</span>
+              <button
+                type="button"
+                onClick={copyPortalUrl}
+                className="inline-flex items-center gap-1.5 max-w-lg text-left text-blue-600 hover:text-blue-700 font-semibold"
+                title="Copy company portal URL"
+                aria-label={`Copy company portal URL: ${portalUrl}`}
+              >
+                <span className="truncate">{portalUrl}</span>
+                {copied ? <Check className="h-4 w-4 flex-none text-green-600" /> : <Copy className="h-4 w-4 flex-none" />}
+              </button>
+              {copied && <span className="text-xs font-medium text-green-600">Copied</span>}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
