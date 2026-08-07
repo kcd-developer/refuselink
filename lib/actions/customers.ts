@@ -6,6 +6,7 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { createAuditLog } from '@/lib/audit'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { formatStreetAddress, formatTitleCase } from '@/lib/text-format'
 
 const customerSchema = z.object({
   type: z.enum(['residential', 'commercial', 'roll_off']),
@@ -52,7 +53,7 @@ function cleanOptional(value?: string | null) {
 }
 
 function normalizeLocation(city?: string | null, state?: string | null) {
-  return { city: cleanOptional(city), state: cleanOptional(state)?.toUpperCase() ?? null }
+  return { city: city?.trim() ? formatTitleCase(city) : null, state: cleanOptional(state)?.toUpperCase() ?? null }
 }
 
 function addressKey(data: { address: string; address2?: string | null; cityId: string; zipCode?: string | null }) {
@@ -239,8 +240,8 @@ export async function importCustomers(companySlug: string, rows: CustomerImportR
           contactName: cleanOptional(row.contactName),
           email: cleanOptional(row.email),
           phone: cleanOptional(row.phone),
-          address: cleanOptional(row.address),
-          address2: cleanOptional(row.address2),
+          address: row.address ? formatStreetAddress(row.address) : null,
+          address2: row.address2 ? formatStreetAddress(row.address2) : null,
           city: location.city,
           state: location.state,
           zipCode: cleanOptional(row.zipCode),

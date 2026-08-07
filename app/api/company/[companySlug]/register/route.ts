@@ -4,20 +4,18 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
-import { address2Compatible, normalizeZipCode, rankAddressCandidates } from '@/lib/address-claim'
+import { address2Compatible, normalizeZipCode } from '@/lib/address-claim'
 import { prisma } from '@/lib/db'
+import { formatPersonName } from '@/lib/text-format'
 
 const registerSchema = z.object({
   fullName: z.string().trim().min(1, 'Full name is required').max(200),
-  email: z.string().trim().email('Enter a valid email address').max(254),
-  phone: z.string().trim().max(30).optional().nullable(),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address').max(254),
+  phone: z.string().trim().regex(/^\(\d{3}\) \d{3}-\d{4}$/, 'Enter a complete 10-digit phone number').optional().nullable().or(z.literal('')),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string().min(8),
   address: z.string().trim().min(1, 'Service address is required').max(300),
-  address2: z.string().trim().max(200).optional().nullable(),
-  city: z.string().trim().min(1, 'City is required').max(100),
-  state: z.string().trim().length(2, 'Use a two-letter state abbreviation'),
-  zipCode: z.string().trim().min(1, 'ZIP code is required').max(20),
+  addressId: z.string().trim().min(1, 'Select your service address from the list.'),
 })
 
 function cleanOptional(value?: string | null) {
@@ -50,35 +48,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
     return publicRegistrationError('Company not found.', 404)
   }
 
-  const state = data.state.toUpperCase()
-  const addressCandidates = await prisma.address.findMany({
-    where: {
-      companyId: company.id,
-      city: {
-        state: { equals: state, mode: 'insensitive' },
-      },
-    },
+  const matchedAddress = await prisma.address.findFirst({
+    where: { id: data.addressId, companyId: company.id },
     include: { city: true, community: true },
-    take: 300,
   })
-
-  const rankedAddresses = rankAddressCandidates(
-    {
-      address: data.address,
-      address2: data.address2,
-      city: data.city,
-      state,
-      zipCode: data.zipCode,
-    },
-    addressCandidates,
-    0.9,
-  )
-
-  const matchedAddress = rankedAddresses[0]?.candidate
 
   if (!matchedAddress) {
     return publicRegistrationError(
-      'We could not match that service address. Check for typos in the street, city, state, and ZIP code or contact the office.',
+      'We could not match that service address. Select it from the list or contact the office.',
       404,
     )
   }
@@ -100,6 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
   }
 
   const passwordHash = await bcrypt.hash(data.password, 12)
+  const fullName = formatPersonName(data.fullName)
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -109,7 +87,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
           address: { equals: matchedAddress.address, mode: 'insensitive' },
           cityId: matchedAddress.cityId,
           OR: [
-            { zipCode: { equals: matchedAddress.zipCode ?? data.zipCode, mode: 'insensitive' } },
+            { zipCode: { equals: matchedAddress.zipCode ?? '', mode: 'insensitive' } },
             { zipCode: null },
             { zipCode: '' },
           ],
@@ -125,7 +103,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
         ? await tx.customer.update({
             where: { id: existingCustomer.id },
             data: {
-              contactName: existingCustomer.contactName ?? data.fullName,
+              contactName: existingCustomer.contactName ?? fullName,
               email: existingCustomer.email ?? data.email,
               phone: existingCustomer.phone ?? cleanOptional(data.phone),
             },
@@ -134,15 +112,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
             data: {
               companyId: company.id,
               type: 'residential',
-              name: data.fullName,
-              contactName: data.fullName,
+              name: fullName,
+              contactName: fullName,
               email: data.email,
               phone: cleanOptional(data.phone),
               address: matchedAddress.address,
               address2: matchedAddress.address2,
               city: matchedAddress.city.name,
               state: matchedAddress.city.state,
-              zipCode: matchedAddress.zipCode ?? data.zipCode,
+              zipCode: matchedAddress.zipCode,
               cityId: matchedAddress.cityId,
               communityId: matchedAddress.communityId,
             },
@@ -152,7 +130,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
         data: {
           email: data.email,
           password: passwordHash,
-          name: data.fullName,
+          name: fullName,
           phone: cleanOptional(data.phone),
         },
       })

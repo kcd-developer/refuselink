@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createAuditLog } from '@/lib/audit'
 import { prisma } from '@/lib/db'
 import { getSession, getSessionUser, type SessionUser } from '@/lib/session'
+import { formatStreetAddress, formatTitleCase } from '@/lib/text-format'
 
 const allowedRoles = ['company_owner', 'company_admin', 'company_manager']
 
@@ -43,7 +44,7 @@ function cleanOptional(value?: string | null) {
 }
 
 function normalizeLocation(city: string, state: string) {
-  return { city: city.trim(), state: state.trim().toUpperCase() }
+  return { city: formatTitleCase(city), state: state.trim().toUpperCase() }
 }
 
 function addressKey(data: { address: string; address2?: string | null; cityId: string; zipCode?: string | null }) {
@@ -249,8 +250,8 @@ export async function importAddresses(companySlug: string, rows: AddressImportRo
         }
 
         const addressData = {
-          address: parsed.data.address,
-          address2: cleanOptional(parsed.data.address2),
+          address: formatStreetAddress(parsed.data.address),
+          address2: parsed.data.address2 ? formatStreetAddress(parsed.data.address2) : null,
           cityId: cachedCity.id,
           zipCode: cleanOptional(parsed.data.zipCode),
         }

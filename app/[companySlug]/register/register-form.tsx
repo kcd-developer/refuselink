@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { Home, Loader2, Lock, Mail, MapPin, Phone, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, Home, Loader2, Lock, Mail, MapPin, Phone, UserPlus } from 'lucide-react'
+import { formatPersonName, formatPhoneNumber } from '@/lib/text-format'
 
 interface Props {
   companySlug: string
@@ -29,10 +30,6 @@ const initialForm = {
   password: '',
   confirmPassword: '',
   address: '',
-  address2: '',
-  city: '',
-  state: '',
-  zipCode: '',
 }
 
 export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
@@ -40,24 +37,28 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
   const [suggestionLoading, setSuggestionLoading] = useState(false)
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const addressSuggestionRequest = useRef(0)
   const router = useRouter()
 
   const updateField = (field: keyof typeof initialForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
+
+    if (field === 'address') {
+      setSelectedAddressId(null)
+    }
   }
 
   const applyAddressSuggestion = (suggestion: AddressSuggestion) => {
     setForm((current) => ({
       ...current,
       address: suggestion.address,
-      address2: suggestion.address2 ?? '',
-      city: suggestion.city,
-      state: suggestion.state,
-      zipCode: suggestion.zipCode ?? current.zipCode,
     }))
+    setSelectedAddressId(suggestion.id)
     setShowAddressSuggestions(false)
     setAddressSuggestions([])
   }
@@ -78,9 +79,6 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
 
     const timeout = window.setTimeout(async () => {
       const params = new URLSearchParams({ address })
-      if (form.city.trim()) params.set('city', form.city.trim())
-      if (form.state.trim()) params.set('state', form.state.trim())
-      if (form.zipCode.trim()) params.set('zipCode', form.zipCode.trim())
 
       try {
         const response = await fetch(`/api/company/${companySlug}/address-suggestions?${params.toString()}`, {
@@ -106,7 +104,7 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [companySlug, form.address, form.city, form.state, form.zipCode])
+  }, [companySlug, form.address])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -117,12 +115,17 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
       return
     }
 
+    if (!selectedAddressId) {
+      setError('Select your service address from the list.')
+      return
+    }
+
     setLoading(true)
     try {
       const response = await fetch(`/api/company/${companySlug}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, addressId: selectedAddressId }),
       })
       const result = await response.json().catch(() => ({}))
 
@@ -163,85 +166,99 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Full name</label>
           <div className="relative">
             <UserPlus className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               required
+              aria-label="Full name"
               value={form.fullName}
               onChange={(event) => updateField('fullName', event.target.value)}
+              onBlur={(event) => updateField('fullName', formatPersonName(event.target.value))}
               className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2"
-              placeholder="Full name"
+              placeholder="Full Name"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="email"
               required
+              aria-label="Email address"
               value={form.email}
               onChange={(event) => updateField('email', event.target.value)}
+              onBlur={(event) => updateField('email', event.target.value.trim().toLocaleLowerCase())}
+              autoComplete="email"
               className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2"
-              placeholder="you@example.com"
+              placeholder="Email Address"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
+              aria-label="Phone number"
               value={form.phone}
-              onChange={(event) => updateField('phone', event.target.value)}
+              onChange={(event) => updateField('phone', formatPhoneNumber(event.target.value))}
+              inputMode="tel"
+              pattern="\(\d{3}\) \d{3}-\d{4}"
+              autoComplete="tel"
               className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2"
-              placeholder="Phone number"
+              placeholder="(555) 123-4567"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
+              aria-label="Password"
               minLength={8}
               value={form.password}
               onChange={(event) => updateField('password', event.target.value)}
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2"
-              placeholder="Minimum 8 characters"
+              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-11 text-sm outline-none focus:border-blue-500 focus:ring-2"
+              placeholder="Minimum 8 Characters"
+              autoComplete="new-password"
             />
+            <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm password</label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
-              type="password"
+              type={showConfirmPassword ? 'text' : 'password'}
               required
+              aria-label="Confirm password"
               minLength={8}
               value={form.confirmPassword}
               onChange={(event) => updateField('confirmPassword', event.target.value)}
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2"
-              placeholder="Confirm password"
+              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-11 text-sm outline-none focus:border-blue-500 focus:ring-2"
+              placeholder="Confirm Password"
+              autoComplete="new-password"
             />
+            <button type="button" onClick={() => setShowConfirmPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Service address</label>
           <div className="relative">
             <Home className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
             <input
               required
+              aria-label="Service address"
               value={form.address}
               onChange={(event) => {
                 updateField('address', event.target.value)
@@ -252,7 +269,7 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
               autoComplete="street-address"
               aria-autocomplete="list"
               className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2"
-              placeholder="Start typing your street address"
+              placeholder="Start Typing Your Street Address"
             />
 
             {showAddressSuggestions && (addressSuggestions.length > 0 || suggestionLoading) && (
@@ -291,34 +308,6 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
           </div>
         </div>
 
-        <input
-          value={form.address2}
-          onChange={(event) => updateField('address2', event.target.value)}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2"
-          placeholder="Address line 2"
-        />
-        <input
-          required
-          value={form.city}
-          onChange={(event) => updateField('city', event.target.value)}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2"
-          placeholder="City"
-        />
-        <input
-          required
-          maxLength={2}
-          value={form.state}
-          onChange={(event) => updateField('state', event.target.value.toUpperCase())}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm uppercase outline-none focus:border-blue-500 focus:ring-2"
-          placeholder="State"
-        />
-        <input
-          required
-          value={form.zipCode}
-          onChange={(event) => updateField('zipCode', event.target.value)}
-          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2"
-          placeholder="ZIP code"
-        />
       </div>
 
       <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
