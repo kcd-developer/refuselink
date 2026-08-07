@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Search, Building, Home, Truck, Plus, X, Pencil } from 'lucide-react'
-import { createCustomer, updateCustomer } from '@/lib/actions/customers'
+import { Download, FileUp, Users, Search, Building, Home, Truck, Plus, X, Pencil } from 'lucide-react'
+import { createCustomer, importCustomers, updateCustomer, type CustomerImportRow } from '@/lib/actions/customers'
 
 const typeIcons: Record<string, any> = { residential: Home, commercial: Building, roll_off: Truck }
 const typeLabels: Record<string, string> = { residential: 'Residential', commercial: 'Commercial', roll_off: 'Roll-Off' }
@@ -15,17 +15,182 @@ interface FormState {
 
 const emptyForm: FormState = { type: 'residential', name: '', contactName: '', email: '', phone: '', address: '', address2: '', city: '', state: '', zipCode: '', cityId: '', communityId: '', accountNumber: '', notes: '' }
 
+const headerAliases: Record<string, keyof CustomerImportRow> = {
+  type: 'type',
+  customertype: 'type',
+  name: 'name',
+  customer: 'name',
+  customername: 'name',
+  account: 'accountNumber',
+  accountnumber: 'accountNumber',
+  accountno: 'accountNumber',
+  accountnum: 'accountNumber',
+  contact: 'contactName',
+  contactname: 'contactName',
+  email: 'email',
+  emailaddress: 'email',
+  phone: 'phone',
+  phonenumber: 'phone',
+  address: 'address',
+  address1: 'address',
+  street: 'address',
+  streetaddress: 'address',
+  address2: 'address2',
+  unit: 'address2',
+  suite: 'address2',
+  city: 'city',
+  state: 'state',
+  zip: 'zipCode',
+  zipcode: 'zipCode',
+  postalcode: 'zipCode',
+  community: 'community',
+  hoa: 'community',
+  notes: 'notes',
+}
+
+function normalizeHeader(value: string) {
+  return value.replace(/^\uFEFF/, '').trim().toLocaleLowerCase().replace(/[\s_-]+/g, '')
+}
+
+function parseCsv(text: string) {
+  const records: string[][] = []
+  let record: string[] = []
+  let field = ''
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    if (character === '"') {
+      if (quoted && text[index + 1] === '"') {
+        field += '"'
+        index += 1
+      } else {
+        quoted = !quoted
+      }
+    } else if (character === ',' && !quoted) {
+      record.push(field.trim())
+      field = ''
+    } else if ((character === '\n' || character === '\r') && !quoted) {
+      if (character === '\r' && text[index + 1] === '\n') index += 1
+      record.push(field.trim())
+      field = ''
+      if (record.some(Boolean)) records.push(record)
+      record = []
+    } else {
+      field += character
+    }
+  }
+  record.push(field.trim())
+  if (record.some(Boolean)) records.push(record)
+  if (quoted) throw new Error('The CSV contains an unclosed quoted value')
+  return records
+}
+
+function normalizeCustomerType(value: string) {
+  const normalized = value.trim().toLocaleLowerCase().replace(/[\s-]+/g, '_')
+  if (normalized === 'commercial') return 'commercial'
+  if (normalized === 'roll_off' || normalized === 'rolloff') return 'roll_off'
+  return 'residential'
+}
+
+function assignCsvField(row: CustomerImportRow, header: keyof CustomerImportRow, value: string) {
+  switch (header) {
+    case 'type':
+      row.type = normalizeCustomerType(value)
+      break
+    case 'name':
+      row.name = value
+      break
+    case 'contactName':
+      row.contactName = value
+      break
+    case 'email':
+      row.email = value
+      break
+    case 'phone':
+      row.phone = value
+      break
+    case 'address':
+      row.address = value
+      break
+    case 'address2':
+      row.address2 = value
+      break
+    case 'city':
+      row.city = value
+      break
+    case 'state':
+      row.state = value
+      break
+    case 'zipCode':
+      row.zipCode = value
+      break
+    case 'community':
+      row.community = value
+      break
+    case 'accountNumber':
+      row.accountNumber = value
+      break
+    case 'notes':
+      row.notes = value
+      break
+  }
+}
+
+function csvToCustomers(text: string) {
+  const records = parseCsv(text)
+  if (records.length < 2) throw new Error('The CSV must include a header and at least one customer')
+  const mappedHeaders = records[0].map((header) => headerAliases[normalizeHeader(header)] ?? null)
+  if (!mappedHeaders.includes('name')) throw new Error('Missing required CSV column: customerName')
+
+  return records.slice(1).map((record) => {
+    const row: CustomerImportRow = {
+      type: 'residential',
+      name: '',
+      contactName: '',
+      email: '',
+      phone: '',
+      address: '',
+      address2: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      community: '',
+      accountNumber: '',
+      notes: '',
+    }
+    mappedHeaders.forEach((header, index) => {
+      if (!header) return
+      assignCsvField(row, header, record[index] ?? '')
+    })
+    row.type = row.type || 'residential'
+    return row
+  })
+}
+
 export function CustomersClient({ customers, companySlug, cities, communities }: { customers: any[]; companySlug: string; cities: any[]; communities: any[] }) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [importRows, setImportRows] = useState<CustomerImportRow[]>([])
+  const [importFileName, setImportFileName] = useState('')
+  const [importError, setImportError] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; skipped: number; addressesCreated: number; citiesCreated: number; errors: string[] } | null>(null)
 
   const resetForm = () => { setShowForm(false); setEditing(null); setForm(emptyForm); setError('') }
+  const openCreateForm = () => {
+    setShowImport(false)
+    resetForm()
+    setShowForm(true)
+  }
   const startEdit = (c: any) => {
+    setShowImport(false)
     setEditing(c)
     setForm({ type: c.type, name: c.name, contactName: c.contactName || '', email: c.email || '', phone: c.phone || '', address: c.address || '', address2: c.address2 || '', city: c.city || '', state: c.state || '', zipCode: c.zipCode || '', cityId: c.cityId || '', communityId: c.communityId || '', accountNumber: c.accountNumber || '', notes: c.notes || '' })
     setShowForm(true); setError('')
@@ -45,6 +210,59 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
     resetForm()
   }
 
+  const handleFile = async (file?: File) => {
+    setImportError('')
+    setImportResult(null)
+    setImportRows([])
+    setImportFileName(file?.name ?? '')
+    if (!file) return
+    if (!file.name.toLocaleLowerCase().endsWith('.csv')) {
+      setImportError('Choose a CSV file')
+      return
+    }
+    try {
+      const parsed = csvToCustomers(await file.text())
+      if (parsed.length > 1000) throw new Error('Import up to 1,000 customers at a time')
+      setImportRows(parsed)
+    } catch (fileError) {
+      setImportError(fileError instanceof Error ? fileError.message : 'Unable to read the CSV file')
+    }
+  }
+
+  const handleImport = async () => {
+    setImporting(true)
+    setImportError('')
+    const result = await importCustomers(companySlug, importRows)
+    setImporting(false)
+    if (!('created' in result)) {
+      setImportError(result.error ?? 'Failed to import customers')
+      return
+    }
+    setImportResult({
+      created: result.created,
+      updated: result.updated,
+      skipped: result.skipped,
+      addressesCreated: result.addressesCreated,
+      citiesCreated: result.citiesCreated,
+      errors: result.errors,
+    })
+    setImportRows([])
+    setImportFileName('')
+  }
+
+  const downloadTemplate = () => {
+    const content = [
+      'type,customerName,accountNumber,contactName,email,phone,address,address2,city,state,zipCode,community,notes',
+      'residential,David Thompson,KCD-R-001,David Thompson,david@example.com,816-555-0100,123 Oak Street,,Kansas City,MO,64101,Hills of Rock Creek,',
+    ].join('\n')
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'refuselink-customer-import-template.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const filtered = (customers ?? []).filter((c: any) => {
     const matchesSearch = (c?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (c?.accountNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -60,10 +278,67 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
           <h1 className="font-display text-2xl font-bold text-slate-900 tracking-tight">Customers</h1>
           <p className="text-sm text-slate-500 mt-1">Manage customer accounts</p>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true) }} className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
-          <Plus className="h-4 w-4" /> Add Customer
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { resetForm(); setShowImport((visible) => !visible); setImportError(''); setImportResult(null) }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
+          >
+            <FileUp className="h-4 w-4" /> Import CSV
+          </button>
+          <button onClick={openCreateForm} className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
+            <Plus className="h-4 w-4" /> Add Customer
+          </button>
+        </div>
       </div>
+
+      {showImport && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-slate-900">Import Customers</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Upload customer accounts in CSV format. Account numbers update existing customers; new addresses are added to the address list.
+              </p>
+            </div>
+            <button onClick={downloadTemplate} className="inline-flex items-center gap-2 px-3 py-2 border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50">
+              <Download className="h-4 w-4" /> Template
+            </button>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">CSV file</label>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => handleFile(event.target.files?.[0])}
+                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={importing || importRows.length === 0}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <FileUp className="h-4 w-4" /> {importing ? 'Importing...' : 'Import Customers'}
+            </button>
+          </div>
+          {importFileName && !importError && importRows.length > 0 && (
+            <p className="text-sm text-slate-500 mt-3">{importRows.length} customer row(s) ready from {importFileName}.</p>
+          )}
+          {importError && <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{importError}</div>}
+          {importResult && (
+            <div className="mt-4 p-3 bg-green-50 text-green-800 rounded-lg text-sm">
+              Imported {importResult.created} new customer(s), updated {importResult.updated}, created {importResult.addressesCreated} address(es), created {importResult.citiesCreated} city record(s), skipped {importResult.skipped}.
+              {importResult.errors.length > 0 && (
+                <ul className="mt-2 list-disc pl-5 text-green-900">
+                  {importResult.errors.map((rowError) => <li key={rowError}>{rowError}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">

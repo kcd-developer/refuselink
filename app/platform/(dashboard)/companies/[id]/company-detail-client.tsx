@@ -11,6 +11,15 @@ export function CompanyDetailClient({ company, plans }: { company: any; plans: a
   const [saving, setSaving] = useState(false)
   const [portalUrl, setPortalUrl] = useState(`/${company?.slug ?? ''}/sign-in`)
   const [copied, setCopied] = useState(false)
+  const isSuspended = status === 'suspended'
+  const isActive = status === 'active'
+  const canToggleStatus = isActive || isSuspended
+  const statusLabel = status ? `${status.charAt(0).toUpperCase()}${status.slice(1)}` : 'Unknown'
+  const statusDescription = isSuspended
+    ? 'Company access is blocked.'
+    : isActive
+      ? 'Company access is available.'
+      : `Company status is ${statusLabel.toLowerCase()}.`
 
   useEffect(() => {
     setPortalUrl(`${window.location.origin}/${company?.slug ?? ''}/sign-in`)
@@ -83,24 +92,45 @@ export function CompanyDetailClient({ company, plans }: { company: any; plans: a
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {status !== 'suspended' ? (
+        <div className="flex flex-col items-end gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Company status</span>
+          {canToggleStatus ? (
             <button
-              onClick={() => handleStatusChange('suspended')}
+              type="button"
+              role="switch"
+              aria-checked={isActive}
+              aria-label={`Company is currently ${isActive ? 'active' : 'suspended'}. Toggle company status.`}
+              onClick={() => handleStatusChange(isActive ? 'suspended' : 'active')}
               disabled={saving}
-              className="px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center gap-1"
+              className="inline-grid grid-cols-2 rounded-full border border-slate-200 bg-white p-1 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Ban className="h-4 w-4" /> Suspend
+              <span
+                className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 transition ${
+                  isSuspended ? 'bg-red-100 text-red-700' : 'text-slate-500'
+                }`}
+              >
+                <Ban className="h-4 w-4" /> Suspended
+              </span>
+              <span
+                className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 transition ${
+                  isActive ? 'bg-green-100 text-green-700' : 'text-slate-500'
+                }`}
+              >
+                <CheckCircle className="h-4 w-4" /> Active
+              </span>
             </button>
           ) : (
-            <button
-              onClick={() => handleStatusChange('active')}
-              disabled={saving}
-              className="px-4 py-2 bg-green-50 text-green-600 text-sm font-medium rounded-lg hover:bg-green-100 disabled:opacity-50 flex items-center gap-1"
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold ${
+                status === 'trial'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
             >
-              <CheckCircle className="h-4 w-4" /> Activate
-            </button>
+              {statusLabel}
+            </span>
           )}
+          <p className="text-xs text-slate-500">{statusDescription}</p>
         </div>
       </div>
 

@@ -82,6 +82,8 @@ model CompanyBranding {
   supportPhone   String?
   supportEmail   String?
   website        String?
+  paymentUrl     String?
+  paymentLabel   String?
   updatedAt      DateTime @updatedAt
 }
 

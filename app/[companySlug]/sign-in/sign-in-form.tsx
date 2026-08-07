@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, LogIn } from 'lucide-react'
 
@@ -88,6 +89,12 @@ export function CompanySignInForm({ companySlug, primaryColor }: Props) {
         <LogIn className="h-4 w-4" />
         {loading ? 'Signing in...' : 'Sign In'}
       </button>
+      <p className="text-center text-sm text-slate-500">
+        Need portal access?{' '}
+        <Link href={`/${companySlug}/register`} className="font-medium hover:underline" style={{ color: primaryColor }}>
+          Claim your service address
+        </Link>
+      </p>
     </form>
   )
 }

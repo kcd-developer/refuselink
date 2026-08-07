@@ -12,6 +12,8 @@ const brandingSchema = z.object({
   supportPhone: z.string().max(30).optional().nullable(),
   supportEmail: z.string().email().optional().nullable().or(z.literal('')),
   website: z.string().url().optional().nullable().or(z.literal('')),
+  paymentUrl: z.string().url().optional().nullable().or(z.literal('')),
+  paymentLabel: z.string().max(80).optional().nullable(),
 })
 
 export async function updateBranding(companySlug: string, data: any) {
@@ -33,6 +35,8 @@ export async function updateBranding(companySlug: string, data: any) {
         supportPhone: d.supportPhone || null,
         supportEmail: d.supportEmail || null,
         website: d.website || null,
+        paymentUrl: d.paymentUrl || null,
+        paymentLabel: d.paymentLabel || null,
       },
       create: {
         companyId: company.id,
@@ -41,6 +45,8 @@ export async function updateBranding(companySlug: string, data: any) {
         supportPhone: d.supportPhone || null,
         supportEmail: d.supportEmail || null,
         website: d.website || null,
+        paymentUrl: d.paymentUrl || null,
+        paymentLabel: d.paymentLabel || null,
       },
     })
     await createAuditLog({ companyId: user.companyId, actorId: user.id, actorType: 'employee', actorName: user.name, action: 'update', entityType: 'branding', entityId: company.id })

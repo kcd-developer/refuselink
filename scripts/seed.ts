@@ -116,13 +116,18 @@ async function main() {
 
   await prisma.companyBranding.upsert({
     where: { companyId: kc.id },
-    update: {},
+    update: {
+      paymentUrl: "https://secure.soft-pak.com/webpakcu02/signin.jsp",
+      paymentLabel: "Pay Bill",
+    },
     create: {
       companyId: kc.id,
       primaryColor: "#1D4ED8",
       secondaryColor: "#93C5FD",
       supportPhone: "(816) 555-0100",
       supportEmail: "support@kcdisposal.example.com",
+      paymentUrl: "https://secure.soft-pak.com/webpakcu02/signin.jsp",
+      paymentLabel: "Pay Bill",
     },
   });
 

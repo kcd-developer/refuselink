@@ -34,15 +34,15 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName }
   return (
     <>
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href={`/${companySlug}/my`} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md flex items-center justify-center" style={{ backgroundColor: color }}>
+        <div className="max-w-7xl mx-auto px-5 h-16 flex items-center gap-6">
+          <Link href={`/${companySlug}/my`} className="flex w-48 shrink-0 items-center gap-2 min-w-0">
+            <div className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center" style={{ backgroundColor: color }}>
               <span className="text-white font-bold text-sm">{companyName?.charAt?.(0) ?? 'C'}</span>
             </div>
-            <span className="font-display font-semibold text-slate-900 hidden sm:inline">{companyName ?? 'Company'}</span>
+            <span className="font-display font-semibold text-slate-900 hidden sm:inline leading-tight truncate">{companyName ?? 'Company'}</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex flex-1 items-center justify-center gap-1">
             {navItems.map((item: any) => {
               const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href)
               return (
@@ -62,18 +62,23 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName }
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-500 hidden sm:inline">{userName ?? ''}</span>
+          <div className="ml-auto flex min-w-0 items-center justify-end gap-3">
+            <div className="hidden md:flex min-w-0 flex-col items-end leading-tight">
+              <span className="max-w-36 truncate text-sm font-medium text-slate-900">{userName ?? 'Customer'}</span>
+              <span className="text-xs text-slate-500">Customer</span>
+            </div>
             <button
               onClick={() => signOut({ callbackUrl: `/${companySlug}/sign-in` })}
-              className="hidden md:flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+              className="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              aria-label="Sign out"
+              title="Sign out"
             >
               <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
             </button>
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2 rounded-md hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-md hover:bg-slate-100"
+              aria-label="Open menu"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -81,7 +86,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName }
         </div>
 
         {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-4 py-3 space-y-1">
+          <div className="lg:hidden bg-white border-t border-slate-100 px-4 py-3 space-y-1">
             {navItems.map((item: any) => {
               const isActive = item.exact ? pathname === item.href : pathname?.startsWith(item.href)
               return (

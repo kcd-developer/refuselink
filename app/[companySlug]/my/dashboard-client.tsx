@@ -1,6 +1,6 @@
 'use client'
 
-import { Ticket, Megaphone, Calendar, FileText, User, ArrowRight } from 'lucide-react'
+import { Ticket, Megaphone, Calendar, User, ArrowRight, CreditCard, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -9,13 +9,15 @@ interface Props {
   userName: string
   companySlug: string
   primaryColor: string
+  paymentUrl?: string | null
+  paymentLabel?: string | null
   accounts: any[]
   openTickets: number
   announcements: any[]
   schedules: any[]
 }
 
-export function CustomerDashboardClient({ userName, companySlug, primaryColor, accounts, openTickets, announcements, schedules }: Props) {
+export function CustomerDashboardClient({ userName, companySlug, primaryColor, paymentUrl, paymentLabel, accounts, openTickets, announcements, schedules }: Props) {
   // Find next scheduled day
   const today = new Date()
   const currentDay = today.getUTCDay()
@@ -78,6 +80,12 @@ export function CustomerDashboardClient({ userName, companySlug, primaryColor, a
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="font-semibold text-slate-900 mb-4">Quick Actions</h3>
           <div className="space-y-2">
+            {paymentUrl && (
+              <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between px-4 py-3 rounded-lg text-white transition-opacity hover:opacity-90" style={{ backgroundColor: primaryColor }}>
+                <span className="inline-flex items-center gap-2 text-sm font-medium"><CreditCard className="h-4 w-4" /> {paymentLabel || 'Pay Bill'}</span>
+                <ExternalLink className="h-4 w-4 opacity-80" />
+              </a>
+            )}
             <Link href={`/${companySlug}/my/tickets`} className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
               <span className="text-sm font-medium text-slate-700">Submit a Request</span>
               <ArrowRight className="h-4 w-4 text-slate-400" />

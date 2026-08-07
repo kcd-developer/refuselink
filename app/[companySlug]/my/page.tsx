@@ -51,6 +51,8 @@ export default async function CustomerDashboardPage({ params }: { params: Promis
       userName={user.name}
       companySlug={resolvedParams.companySlug}
       primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
+      paymentUrl={company?.branding?.paymentUrl ?? null}
+      paymentLabel={company?.branding?.paymentLabel ?? null}
       accounts={JSON.parse(JSON.stringify(access ?? []))}
       openTickets={openTickets ?? 0}
       announcements={JSON.parse(JSON.stringify(announcements ?? []))}

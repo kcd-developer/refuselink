@@ -55,10 +55,11 @@ export async function middleware(req: NextRequest) {
 
   const companySlug = segments[0];
   const isSignIn = segments[1] === "sign-in" && segments.length === 2;
+  const isRegister = segments[1] === "register" && segments.length === 2;
   const isCustomerArea = segments[1] === "my";
 
-  // Sign-in page: allow unauthenticated, redirect signed-in users
-  if (isSignIn) {
+  // Sign-in and customer registration pages: allow unauthenticated, redirect signed-in users
+  if (isSignIn || isRegister) {
     if (token) {
       const tokenData = token as any;
       if (tokenData.userType === "platform") {

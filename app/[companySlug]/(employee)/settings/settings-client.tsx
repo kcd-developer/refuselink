@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Save, Palette, Phone, Mail, Globe } from 'lucide-react'
+import { Settings, Save, Palette, Phone, Mail, Globe, CreditCard } from 'lucide-react'
 import { updateBranding } from '@/lib/actions/settings'
 
 export function SettingsClient({ company, companySlug }: { company: any; companySlug: string }) {
@@ -11,6 +11,8 @@ export function SettingsClient({ company, companySlug }: { company: any; company
   const [supportPhone, setSupportPhone] = useState(b.supportPhone ?? '')
   const [supportEmail, setSupportEmail] = useState(b.supportEmail ?? '')
   const [website, setWebsite] = useState(b.website ?? '')
+  const [paymentUrl, setPaymentUrl] = useState(b.paymentUrl ?? '')
+  const [paymentLabel, setPaymentLabel] = useState(b.paymentLabel ?? 'Pay Bill')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -22,6 +24,8 @@ export function SettingsClient({ company, companySlug }: { company: any; company
       supportPhone: supportPhone || null,
       supportEmail: supportEmail || null,
       website: website || null,
+      paymentUrl: paymentUrl || null,
+      paymentLabel: paymentLabel || null,
     })
     setSaving(false)
     if (result.error) { setMessage(result.error); return }
@@ -98,6 +102,20 @@ export function SettingsClient({ company, companySlug }: { company: any; company
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-1"><Globe className="h-3 w-3" /> Website</label>
               <input type="url" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://example.com" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div className="rounded-lg border border-slate-200 p-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-1 flex items-center gap-2"><CreditCard className="h-4 w-4" /> Customer Payment Link</h4>
+              <p className="text-xs text-slate-500 mb-3">Customers will see this as a payment option inside their account dashboard.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Button Label</label>
+                  <input value={paymentLabel} onChange={e => setPaymentLabel(e.target.value)} placeholder="Pay Bill" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Payment URL</label>
+                  <input type="url" value={paymentUrl} onChange={e => setPaymentUrl(e.target.value)} placeholder="https://payments.example.com/login" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+              </div>
             </div>
             <button type="submit" disabled={saving} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
               <Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Branding'}
