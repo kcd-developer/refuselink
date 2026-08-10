@@ -117,10 +117,11 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
 
   const handleBulkRouteAssignment = async () => {
     if (!selected || !bulkRoute.route.trim()) return
+    const savedRoute = companySlug === 'kc-disposal' ? bulkRoute.route.trim().toLocaleUpperCase() : bulkRoute.route.trim()
     const serviceName = serviceLabels[bulkRoute.service as keyof typeof serviceLabels]
-    if (!window.confirm(`Apply ${serviceName} route ${bulkRoute.route} on ${dayNames[bulkRoute.dayOfWeek]} to all ${selected._count.addresses} addresses in ${selected.name}?`)) return
+    if (!window.confirm(`Apply ${serviceName} route ${savedRoute} on ${dayNames[bulkRoute.dayOfWeek]} to all ${selected._count.addresses} addresses in ${selected.name}?`)) return
     setBulkRouteLoading(true); setBulkRouteError(''); setBulkRouteResult('')
-    const result = await applyCommunityRouteAssignment(companySlug, selected.id, bulkRoute)
+    const result = await applyCommunityRouteAssignment(companySlug, selected.id, { ...bulkRoute, route: savedRoute })
     setBulkRouteLoading(false)
     if (result.error) { setBulkRouteError(result.error); return }
     setBulkRouteResult(`Updated ${result.updated} addresses.`)
@@ -131,7 +132,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
         {
           service: bulkRoute.service as ServiceSummary['service'],
           assignedCount: current._count.addresses,
-          routes: [bulkRoute.route.trim()],
+          routes: [savedRoute],
           containerSizes: [bulkRoute.containerSize || 'No Container'],
           daysOfWeek: [bulkRoute.dayOfWeek],
         },
@@ -140,7 +141,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
         ...address,
         services: [
           ...address.services.filter((service) => service.service !== bulkRoute.service),
-          { service: bulkRoute.service, route: bulkRoute.route.trim(), containerSize: bulkRoute.containerSize || null, dayOfWeek: bulkRoute.dayOfWeek },
+          { service: bulkRoute.service, route: savedRoute, containerSize: bulkRoute.containerSize || null, dayOfWeek: bulkRoute.dayOfWeek },
         ],
       })),
     } : current)

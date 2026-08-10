@@ -48,7 +48,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
       <div className="flex items-center justify-between px-4 py-5 border-b border-slate-200">
         {!collapsed && (
           <Link href={`/${companySlug}/dashboard`} className="flex items-center gap-2 min-w-0">
-            <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor ?? '#1D4ED8' }}>
+            <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor ?? '#1D4ED8', boxShadow: 'inset 0 -3px 0 var(--company-secondary)' }}>
               <span className="text-white font-bold text-sm">{companyName?.charAt?.(0) ?? 'C'}</span>
             </div>
             <span className="font-display font-semibold text-slate-900 truncate">{companyName ?? 'Company'}</span>
@@ -77,7 +77,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
               )}
               style={isActive ? { backgroundColor: primaryColor ?? '#1D4ED8' } : undefined}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <item.icon className="h-5 w-5 flex-shrink-0" style={!isActive ? { color: 'var(--company-secondary)' } : undefined} />
               {!collapsed && <span>{item.label}</span>}
             </Link>
           )

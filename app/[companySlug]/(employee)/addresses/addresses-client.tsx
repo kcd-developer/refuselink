@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download, FileUp, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, ChevronsUpDown, Download, FileUp, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import {
   createAddress,
   deleteAddress,
@@ -35,6 +35,10 @@ interface AddressRecord {
   services: Array<{ id: string; service: 'trash' | 'recycling' | 'yard_waste'; route: string | null; containerSize: string | null; dayOfWeek: number }>
 }
 
+type SortKey = 'address' | 'city' | 'zip' | 'community' | 'services'
+type SortDirection = 'asc' | 'desc'
+const addressCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
 const serviceTypes = [
   { value: 'trash' as const, label: 'Trash' },
   { value: 'recycling' as const, label: 'Recycling' },
@@ -56,19 +60,26 @@ const emptyForm: AddressInput = {
   services: [],
 }
 
-const headerAliases: Record<string, keyof AddressImportRow> = {
+type AddressComponentField = 'softPakAddressNumber' | 'softPakPreDirection' | 'softPakStreet' | 'softPakStreetSuffix' | 'softPakPostDirection' | 'softPakUnit' | 'softPakAddress2' | 'county'
+type ImportField = keyof AddressImportRow | AddressComponentField
+
+const headerAliases: Record<string, ImportField> = {
   address: 'address',
   address1: 'address',
-  street: 'address',
   streetaddress: 'address',
   address2: 'address2',
-  unit: 'address2',
+  direction1: 'softPakPreDirection',
+  street: 'softPakStreet',
+  streetsuffix: 'softPakStreetSuffix',
+  direction2: 'softPakPostDirection',
+  unit: 'softPakUnit',
   suite: 'address2',
   city: 'city',
   state: 'state',
   zip: 'zipCode',
   zipcode: 'zipCode',
   postalcode: 'zipCode',
+  county: 'county',
   community: 'community',
   latitude: 'latitude',
   lat: 'latitude',
@@ -99,10 +110,26 @@ const headerAliases: Record<string, keyof AddressImportRow> = {
   yardwasteday: 'yardWasteDay',
   yardwastecontainersize: 'yardWasteContainerSize',
   yardwastesize: 'yardWasteContainerSize',
+  servaddr: 'softPakAddressNumber',
+  servdir: 'softPakPreDirection',
+  servstreet: 'softPakStreet',
+  servstrtsufx: 'softPakStreetSuffix',
+  servdir2: 'softPakPostDirection',
+  servaptste: 'softPakUnit',
+  servaddr2: 'softPakAddress2',
+  servcity: 'city',
+  servstate: 'state',
+  servzip: 'zipCode',
 }
 
 function normalizeHeader(value: string) {
-  return value.replace(/^\uFEFF/, '').trim().toLocaleLowerCase().replace(/[\s_-]+/g, '')
+  return value.replace(/^\uFEFF/, '').trim().toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function formatSoftPakUnit(value: string) {
+  const unit = value.trim()
+  if (!unit || /^(?:apt|apartment|ste|suite|unit|#)\b/i.test(unit)) return unit
+  return `Apt ${unit}`
 }
 
 function parseCsv(text: string) {
@@ -143,15 +170,27 @@ function csvToAddresses(text: string) {
   const records = parseCsv(text)
   if (records.length < 2) throw new Error('The CSV must include a header and at least one address')
   const mappedHeaders = records[0].map((header) => headerAliases[normalizeHeader(header)] ?? null)
-  for (const required of ['address', 'city', 'state'] as const) {
+  const hasCompleteAddress = mappedHeaders.includes('address') || (
+    mappedHeaders.includes('softPakAddressNumber') && mappedHeaders.includes('softPakStreet')
+  )
+  if (!hasCompleteAddress) throw new Error('Missing address column or Soft-Pak SERV ADDR# and SERV STREET columns')
+  for (const required of ['city', 'state'] as const) {
     if (!mappedHeaders.includes(required)) throw new Error(`Missing required CSV column: ${required}`)
   }
 
   return records.slice(1).map((record) => {
-    const row: AddressImportRow = { address: '', city: '', state: '' }
+    const row: AddressImportRow & Partial<Record<AddressComponentField, string>> = { address: '', city: '', state: '' }
     mappedHeaders.forEach((header, index) => {
       if (header) (row as any)[header] = record[index] ?? ''
     })
+    if (row.softPakStreet) {
+      row.address = [row.address || row.softPakAddressNumber, row.softPakPreDirection, row.softPakStreet, row.softPakStreetSuffix, row.softPakPostDirection]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(' ')
+    }
+    const unit = formatSoftPakUnit(row.softPakUnit ?? '')
+    if (!row.address2) row.address2 = [unit, row.softPakAddress2?.trim()].filter(Boolean).join(', ')
     return row
   })
 }
@@ -163,6 +202,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
   companySlug: string
 }) {
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'address', direction: 'asc' })
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState<AddressRecord | null>(null)
@@ -293,7 +333,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
   }
 
   const downloadTemplate = () => {
-    const content = 'address,address2,city,state,zipCode,community,latitude,latitudeDirection,longitude,longitudeDirection,trash,trashRoute,trashDay,trashContainerSize,recycle,recycleRoute,recycleDay,recycleContainerSize,yardWaste,yardWasteRoute,yardWasteDay,yardWasteContainerSize\n123 Main St,,Kansas City,KS,66101,Example HOA,39.0997,N,94.5786,W,yes,T-1,Monday,95g,yes,R-2,Thursday,65g,yes,Y-3,Tuesday,\n'
+    const content = 'address,direction1,street,streetSuffix,direction2,unit,city,state,zip,county,community,latitude,longitude,trash,trashRoute,trashDay,trashContainerSize,recycle,recycleRoute,recycleDay,recycleContainerSize,yardWaste,yardWasteRoute,yardWasteDay,yardWasteContainerSize\n1234,SW,Main,St,,Apt 12,Kansas City,KS,64101,Jackson,Example HOA,39.0997,-94.5786,yes,RT08,Monday,95g,yes,RR14,Thursday,65g,yes,RY04,Tuesday,\n'
     const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }))
     const link = document.createElement('a')
     link.href = url
@@ -302,11 +342,40 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
     URL.revokeObjectURL(url)
   }
 
-  const filtered = addresses.filter((record) => {
+  const filtered = useMemo(() => {
     const value = search.toLocaleLowerCase()
-    return [record.address, record.address2, record.city.name, record.city.state, record.zipCode, record.community?.name]
-      .some((part) => part?.toLocaleLowerCase().includes(value))
-  })
+    const matching = addresses.filter((record) =>
+      [record.address, record.address2, record.city.name, record.city.state, record.zipCode, record.community?.name]
+        .some((part) => part?.toLocaleLowerCase().includes(value)),
+    )
+    const sortValue = (record: AddressRecord) => {
+      if (sort.key === 'address') return `${record.address} ${record.address2 ?? ''}`
+      if (sort.key === 'city') return `${record.city.name} ${record.city.state}`
+      if (sort.key === 'zip') return record.zipCode ?? ''
+      if (sort.key === 'community') return record.community?.name ?? ''
+      return record.services.map((service) => `${service.service} ${service.route ?? ''} ${dayNames[service.dayOfWeek]}`).join(' ')
+    }
+    return [...matching].sort((left, right) => {
+      const comparison = addressCollator.compare(sortValue(left), sortValue(right))
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [addresses, search, sort])
+
+  const changeSort = (key: SortKey) => {
+    setSort((current) => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' }))
+  }
+
+  const sortableHeader = (key: SortKey, label: string) => {
+    const active = sort.key === key
+    const Icon = !active ? ChevronsUpDown : sort.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <th aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'} className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <button type="button" onClick={() => changeSort(key)} className="inline-flex items-center gap-1.5 hover:text-slate-800" title={`Sort by ${label}`}>
+          {label}<Icon className="h-3.5 w-3.5" />
+        </button>
+      </th>
+    )
+  }
 
   return (
     <div>
@@ -333,7 +402,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <h2 className="font-semibold text-slate-900">Import addresses from CSV</h2>
-              <p className="text-sm text-slate-500 mt-1">Use the exact header names below, or download the ready-to-use template.</p>
+              <p className="text-sm text-slate-500 mt-1">Upload a CSV file or download the ready-to-use RefuseLink template.</p>
             </div>
             <button onClick={() => setShowImport(false)} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4" /></button>
           </div>
@@ -350,10 +419,13 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
             <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <p className="font-semibold text-slate-800">Address headers</p>
-                <p className="mt-1"><span className="font-medium">Required:</span> <code>address</code>, <code>city</code>, <code>state</code></p>
-                <p className="mt-1"><span className="font-medium">Optional:</span> <code>address2</code>, <code>zipCode</code>, <code>community</code></p>
-                <p className="mt-1"><span className="font-medium">Coordinates:</span> <code>latitude</code>, <code>latitudeDirection</code>, <code>longitude</code>, <code>longitudeDirection</code></p>
-                <p className="mt-1 text-slate-500">Use N or S for latitude direction and E or W for longitude direction.</p>
+                <p className="mt-1"><span className="font-medium">Required:</span> <code>address</code> (house number), <code>street</code>, <code>city</code>, <code>state</code></p>
+                <p className="mt-1"><span className="font-medium">Optional address parts:</span> <code>direction1</code>, <code>streetSuffix</code>, <code>direction2</code>, <code>unit</code></p>
+                <p className="mt-1"><span className="font-medium">Optional location:</span> <code>zip</code>, <code>county</code></p>
+                <p className="mt-1"><span className="font-medium">Other optional:</span> <code>community</code></p>
+                <p className="mt-1 text-slate-500">Older CSV files may still place the complete street address in <code>address</code> and omit <code>street</code>.</p>
+                <p className="mt-1"><span className="font-medium">Coordinates:</span> <code>latitude</code>, <code>longitude</code></p>
+                <p className="mt-1 text-slate-500">Use signed decimal coordinates. Positive latitude is north, negative latitude is south, positive longitude is east, and negative longitude is west. Example: <code>39.0997</code>, <code>-94.5786</code>.</p>
               </div>
               <div>
                 <p className="font-semibold text-slate-800">Service headers (all optional)</p>
@@ -362,8 +434,16 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
                 <p className="mt-1"><code>yardWaste</code>, <code>yardWasteRoute</code>, <code>yardWasteDay</code>, <code>yardWasteContainerSize</code></p>
               </div>
             </div>
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <p className="font-semibold text-slate-800">Separated-address example</p>
+              <div className="mt-2 overflow-x-auto rounded-md bg-white p-3 font-mono text-[11px] leading-5 text-slate-600">
+                <p className="whitespace-nowrap">address,direction1,street,streetSuffix,direction2,unit,city,state,zip,county</p>
+                <p className="whitespace-nowrap">12509,SW,55th,Ave,,Apt 12,Overland Park,KS,66213,Johnson</p>
+              </div>
+              <p className="mt-2 text-slate-500">Imported as <span className="font-medium text-slate-700">12509 SW 55th Ave</span> with unit <span className="font-medium text-slate-700">Apt 12</span>.</p>
+            </div>
             <div className="mt-4 border-t border-slate-200 pt-3 text-slate-500">
-              <p><span className="font-medium text-slate-700">Service:</span> use <code>yes</code> to enable or <code>no</code> to remove it. Days may be full names such as <code>Monday</code> or numbers 0–6 (Sunday–Saturday).</p>
+              <p><span className="font-medium text-slate-700">Service:</span> use <code>yes</code> to enable or <code>no</code> to remove it. Days may be full names such as <code>Monday</code> or numbers 0–6 (Sunday–Saturday). KC Disposal route codes use uppercase formats such as <code>RT08</code> and <code>RR14</code>.</p>
               <p className="mt-1"><span className="font-medium text-slate-700">Containers:</span> use values such as <code>95g</code>, <code>65g</code>, or <code>35g</code>. Leave the container-size cell blank when service is provided without a container, such as bagged Yard Waste.</p>
               <p className="mt-1">Uploading an existing address updates its supplied service, route, day, container, coordinate, and community information without creating a duplicate.</p>
             </div>
@@ -494,11 +574,11 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100">
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Address</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">City / State</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">ZIP</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Community</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Services / Routes</th>
+              {sortableHeader('address', 'Address')}
+              {sortableHeader('city', 'City / State')}
+              {sortableHeader('zip', 'ZIP')}
+              {sortableHeader('community', 'Community')}
+              {sortableHeader('services', 'Services / Routes')}
               <th className="px-6 py-3 w-24" />
             </tr>
           </thead>

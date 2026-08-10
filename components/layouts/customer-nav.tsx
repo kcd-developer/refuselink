@@ -39,7 +39,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-5 h-16 flex items-center gap-6">
           <Link href={`/${companySlug}/my`} className="flex w-48 shrink-0 items-center gap-2 min-w-0">
-            <div className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center" style={{ backgroundColor: color }}>
+            <div className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center" style={{ backgroundColor: color, boxShadow: 'inset 0 -3px 0 var(--company-secondary)' }}>
               <span className="text-white font-bold text-sm">{companyName?.charAt?.(0) ?? 'C'}</span>
             </div>
             <span className="font-display font-semibold text-slate-900 hidden sm:inline leading-tight truncate">{companyName ?? 'Company'}</span>
@@ -58,7 +58,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
                   )}
                   style={isActive ? { backgroundColor: color } : undefined}
                 >
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="h-4 w-4" style={!isActive ? { color: 'var(--company-secondary)' } : undefined} />
                   <span>{item.label}</span>
                 </Link>
               )
@@ -103,7 +103,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
                   )}
                   style={isActive ? { backgroundColor: color } : undefined}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <item.icon className="h-5 w-5" style={!isActive ? { color: 'var(--company-secondary)' } : undefined} />
                   <span>{item.label}</span>
                 </Link>
               )

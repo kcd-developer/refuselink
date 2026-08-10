@@ -107,6 +107,11 @@ function normalizeContainerSize(value?: string | null) {
   return match ? `${match[1]}g` : cleaned
 }
 
+function normalizeRoute(value: string | null | undefined, uppercase: boolean) {
+  const route = cleanOptional(value)
+  return route && uppercase ? route.toLocaleUpperCase() : route
+}
+
 function normalizeLocation(city: string, state: string) {
   return { city: formatTitleCase(city), state: state.trim().toUpperCase() }
 }
@@ -140,7 +145,7 @@ function isEnabled(value?: string) {
   return ['1', 'true', 'yes', 'y', 'x'].includes(value?.trim().toLocaleLowerCase() ?? '')
 }
 
-function servicesFromImport(row: AddressImportRow) {
+function servicesFromImport(row: AddressImportRow, uppercaseRoutes = false) {
   const definitions = [
     { service: 'trash' as const, enabled: row.trash, route: row.trashRoute, day: row.trashDay, containerSize: row.trashContainerSize },
     { service: 'recycling' as const, enabled: row.recycle, route: row.recycleRoute, day: row.recycleDay, containerSize: row.recycleContainerSize },
@@ -154,29 +159,15 @@ function servicesFromImport(row: AddressImportRow) {
     if (!enabled) return { service: item.service, assignment: null }
     const dayOfWeek = parseDay(item.day)
     if (dayOfWeek === null) throw new Error(`${item.service.replace('_', ' ')} requires a valid service day`)
-    return { service: item.service, assignment: { route: cleanOptional(item.route), containerSize: normalizeContainerSize(item.containerSize), dayOfWeek } }
+    return { service: item.service, assignment: { route: normalizeRoute(item.route, uppercaseRoutes), containerSize: normalizeContainerSize(item.containerSize), dayOfWeek } }
   })
 }
 
-async function applyImportedServices(tx: Prisma.TransactionClient, addressId: string, services: NonNullable<ReturnType<typeof servicesFromImport>>) {
-  for (const item of services) {
-    if (!item.assignment) {
-      await tx.addressService.deleteMany({ where: { addressId, service: item.service } })
-      continue
-    }
-    await tx.addressService.upsert({
-      where: { addressId_service: { addressId, service: item.service } },
-      create: { addressId, service: item.service, ...item.assignment },
-      update: item.assignment,
-    })
-  }
-}
-
-async function replaceServices(tx: Prisma.TransactionClient, addressId: string, services: z.infer<typeof serviceAssignmentSchema>[]) {
+async function replaceServices(tx: Prisma.TransactionClient, addressId: string, services: z.infer<typeof serviceAssignmentSchema>[], uppercaseRoutes = false) {
   await tx.addressService.deleteMany({ where: { addressId } })
   if (services.length) {
     await tx.addressService.createMany({
-      data: services.map((service) => ({ addressId, service: service.service, route: cleanOptional(service.route), containerSize: normalizeContainerSize(service.containerSize), dayOfWeek: service.dayOfWeek })),
+      data: services.map((service) => ({ addressId, service: service.service, route: normalizeRoute(service.route, uppercaseRoutes), containerSize: normalizeContainerSize(service.containerSize), dayOfWeek: service.dayOfWeek })),
     })
   }
 }
@@ -258,7 +249,7 @@ export async function createAddress(companySlug: string, data: AddressInput) {
       const address = await tx.address.create({
         data: { companyId: auth.user.companyId!, ...addressData, communityId },
       })
-      await replaceServices(tx, address.id, parsed.data.services)
+      await replaceServices(tx, address.id, parsed.data.services, companySlug === 'kc-disposal')
       return { address, cityCreated: cityResult.created }
     })
 
@@ -292,7 +283,7 @@ export async function updateAddress(companySlug: string, addressId: string, data
       }
       if (await findDuplicate(tx, auth.user.companyId!, addressData, addressId)) throw new Error('This address already exists')
       await tx.address.update({ where: { id: addressId }, data: { ...addressData, communityId } })
-      await replaceServices(tx, addressId, parsed.data.services)
+      await replaceServices(tx, addressId, parsed.data.services, companySlug === 'kc-disposal')
     })
 
     await logAddressAction(auth.user, 'update', addressId)
@@ -344,6 +335,7 @@ export async function importAddresses(companySlug: string, rows: AddressImportRo
       let updated = 0
       let skipped = 0
       let citiesCreated = 0
+      const serviceUpdates = new Map<string, NonNullable<ReturnType<typeof servicesFromImport>>>()
 
       for (let index = 0; index < rows.length; index += 1) {
         const parsed = importRowSchema.safeParse({
@@ -399,7 +391,7 @@ export async function importAddresses(companySlug: string, rows: AddressImportRo
         const key = importIdentityKey(addressData)
         let services: ReturnType<typeof servicesFromImport>
         try {
-          services = servicesFromImport(parsed.data)
+          services = servicesFromImport(parsed.data, companySlug === 'kc-disposal')
         } catch (error) {
           skipped += 1
           errors.push(`Row ${index + 2}: ${error instanceof Error ? error.message : 'Invalid service assignment'}`)
@@ -420,24 +412,42 @@ export async function importAddresses(companySlug: string, rows: AddressImportRo
               ...(defaultCommunityId || parsed.data.community !== undefined ? { communityId } : {}),
             },
           })
-          if (services) await applyImportedServices(tx, existing.id, services)
+          if (services) serviceUpdates.set(existing.id, services)
           updated += 1
           continue
         }
 
         const created = await tx.address.create({ data: { companyId: auth.user.companyId!, ...addressData, communityId } })
         existingByKey.set(key, created)
-        if (services) await applyImportedServices(tx, created.id, services)
+        if (services) serviceUpdates.set(created.id, services)
         imported += 1
       }
 
+      if (serviceUpdates.size) {
+        await tx.addressService.deleteMany({
+          where: {
+            OR: [...serviceUpdates].map(([addressId, services]) => ({
+              addressId,
+              service: { in: services.map((item) => item.service) },
+            })),
+          },
+        })
+        const assignments = [...serviceUpdates].flatMap(([addressId, services]) =>
+          services.flatMap((item) => item.assignment ? [{ addressId, service: item.service, ...item.assignment }] : []),
+        )
+        if (assignments.length) await tx.addressService.createMany({ data: assignments, skipDuplicates: true })
+      }
+
       return { imported, updated, skipped, citiesCreated, errors: errors.slice(0, 25) }
-    }, { timeout: 30000 })
+    }, { maxWait: 10000, timeout: 120000 })
 
     await logAddressAction(auth.user, 'import', null, result)
     revalidateAddressPaths(companySlug)
     return { success: true, ...result }
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2028') {
+      return { error: 'The import took too long and no changes were saved. Please try the import again.' }
+    }
     return { error: error instanceof Error ? error.message : 'Failed to import addresses' }
   }
 }

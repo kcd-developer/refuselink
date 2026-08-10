@@ -45,22 +45,22 @@ export function CustomerDashboardClient({ userName, companySlug, primaryColor, p
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <Calendar className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+          <Calendar className="h-5 w-5 mb-2" style={{ color: 'var(--company-secondary)' }} />
           <p className="text-lg font-bold text-slate-900">{nextServiceDay || 'N/A'}</p>
           <p className="text-xs text-slate-500">Next Service</p>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <Ticket className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+          <Ticket className="h-5 w-5 mb-2" style={{ color: 'var(--company-secondary)' }} />
           <p className="text-lg font-bold text-slate-900">{openTickets ?? 0}</p>
           <p className="text-xs text-slate-500">Open Tickets</p>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <Megaphone className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+          <Megaphone className="h-5 w-5 mb-2" style={{ color: 'var(--company-secondary)' }} />
           <p className="text-lg font-bold text-slate-900">{(announcements ?? []).length}</p>
           <p className="text-xs text-slate-500">Announcements</p>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <User className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+          <User className="h-5 w-5 mb-2" style={{ color: 'var(--company-secondary)' }} />
           <p className="text-lg font-bold text-slate-900">{(accounts ?? []).length}</p>
           <p className="text-xs text-slate-500">Linked Accounts</p>
         </div>

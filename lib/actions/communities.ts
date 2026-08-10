@@ -88,7 +88,11 @@ export async function applyCommunityRouteAssignment(companySlug: string, communi
   const addresses = await prisma.address.findMany({ where: { companyId: user.companyId!, communityId }, select: { id: true } })
   if (!addresses.length) return { error: 'This community has no addresses' }
   const addressIds = addresses.map((address) => address.id)
-  const assignment = { ...parsed.data, containerSize: normalizeContainerSize(parsed.data.containerSize) }
+  const assignment = {
+    ...parsed.data,
+    route: companySlug === 'kc-disposal' ? parsed.data.route.toLocaleUpperCase() : parsed.data.route,
+    containerSize: normalizeContainerSize(parsed.data.containerSize),
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.addressService.updateMany({
