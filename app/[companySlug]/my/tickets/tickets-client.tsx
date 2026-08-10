@@ -18,6 +18,7 @@ const statusLabels: Record<string, string> = {
 export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { tickets: any[]; companySlug: string; customerIds: string[] }) {
   const [showCreate, setShowCreate] = useState(false)
   const [subject, setSubject] = useState('')
+  const [category, setCategory] = useState('missed_pickup')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -30,10 +31,10 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { t
     try {
       const res = await fetch(`/api/company/${companySlug}/customer/tickets`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, message, customerId: customerIds[0] }),
+        body: JSON.stringify({ subject, message, category, customerId: customerIds[0] }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || 'Failed to create ticket'); setLoading(false); return }
-      setShowCreate(false); setSubject(''); setMessage('')
+      setShowCreate(false); setSubject(''); setMessage(''); setCategory('missed_pickup')
       router.refresh()
     } catch { setError('Failed to create ticket') }
     setLoading(false)
@@ -46,9 +47,9 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { t
           <h1 className="font-display text-2xl font-bold text-slate-900 tracking-tight">Support Tickets</h1>
           <p className="text-sm text-slate-500 mt-1">Submit and track service requests</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+        {customerIds.length > 0 && <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
           <Plus className="h-4 w-4" /> New Ticket
-        </button>
+        </button>}
       </div>
 
       {showCreate && (
@@ -59,6 +60,20 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { t
           </div>
           {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
           <form onSubmit={handleCreate} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Issue Type *</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm">
+                <option value="missed_pickup">Missed Pickup</option>
+                <option value="recycling_issue">Recycling Issue</option>
+                <option value="yard_waste_issue">Yard Waste Issue</option>
+                <option value="cart_issue">Cart Issue</option>
+                <option value="illegal_dumping">Illegal Dumping</option>
+                <option value="community_cleanliness">Community Cleanliness</option>
+                <option value="service_delay">Service Delay</option>
+                <option value="billing_account">Billing or Account Question (Private)</option>
+                <option value="other">Other Service Issue</option>
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Subject *</label>
               <input value={subject} onChange={e => setSubject(e.target.value)} required placeholder="Brief description of the issue" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />

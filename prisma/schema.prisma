@@ -153,35 +153,62 @@ model City {
 }
 
 model Community {
-  id        String     @id @default(cuid())
-  companyId String
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  cityId    String
-  city      City       @relation(fields: [cityId], references: [id])
-  name      String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  addresses Address[]
-  customers Customer[]
+  id          String                @id @default(cuid())
+  companyId   String
+  company     Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cityId      String
+  city        City                  @relation(fields: [cityId], references: [id])
+  name        String
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  addresses   Address[]
+  customers   Customer[]
+  memberships CommunityMembership[]
 }
 
 model Address {
-  id          String     @id @default(cuid())
+  id          String           @id @default(cuid())
   companyId   String
-  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   address     String
   address2    String?
   cityId      String
-  city        City       @relation(fields: [cityId], references: [id])
+  city        City             @relation(fields: [cityId], references: [id])
   communityId String?
-  community   Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  community   Community?       @relation(fields: [communityId], references: [id], onDelete: SetNull)
   zipCode     String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  latitude    Float?
+  longitude   Float?
+  claimedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  services    AddressService[]
 
   @@index([companyId])
+  @@index([companyId, claimedAt])
   @@index([cityId])
   @@index([communityId])
+}
+
+model AddressService {
+  id            String      @id @default(cuid())
+  addressId     String
+  address       Address     @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  service       ServiceType
+  route         String?
+  containerSize String?
+  dayOfWeek     Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([addressId, service])
+  @@index([addressId])
+}
+
+enum ServiceType {
+  trash
+  recycling
+  yard_waste
 }
 
 model Customer {
@@ -218,15 +245,42 @@ enum CustomerType {
 }
 
 model CustomerUser {
-  id        String               @id @default(cuid())
-  email     String               @unique
-  password  String
-  name      String
-  phone     String?
-  isActive  Boolean              @default(true)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  accounts  CustomerUserAccess[]
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  password             String
+  name                 String
+  phone                String?
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  accounts             CustomerUserAccess[]
+  communityMemberships CommunityMembership[]
+}
+
+model CommunityMembership {
+  id             String        @id @default(cuid())
+  communityId    String
+  community      Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  customerUserId String
+  customerUser   CustomerUser  @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  role           CommunityRole
+  positionTitle  String?
+  publicEmail    String?
+  publicPhone    String?
+  showEmail      Boolean       @default(true)
+  showPhone      Boolean       @default(true)
+  isActive       Boolean       @default(true)
+  assignedById   String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([communityId, customerUserId])
+  @@index([customerUserId])
+}
+
+enum CommunityRole {
+  board_member
+  community_manager
 }
 
 model CustomerUserAccess {
@@ -328,6 +382,7 @@ model Ticket {
   customer      Customer        @relation(fields: [customerId], references: [id])
   ticketNumber  String
   subject       String
+  category      TicketCategory  @default(other)
   status        TicketStatus    @default(open)
   priority      TicketPriority  @default(normal)
   assignedToId  String?
@@ -339,6 +394,18 @@ model Ticket {
   messages      TicketMessage[]
 
   @@unique([companyId, ticketNumber])
+}
+
+enum TicketCategory {
+  missed_pickup
+  recycling_issue
+  yard_waste_issue
+  cart_issue
+  illegal_dumping
+  community_cleanliness
+  service_delay
+  billing_account
+  other
 }
 
 enum TicketStatus {

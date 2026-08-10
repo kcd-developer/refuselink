@@ -11,6 +11,20 @@ const communitySchema = z.object({
   cityId: z.string().min(1, 'City is required'),
 })
 
+const routeAssignmentSchema = z.object({
+  service: z.enum(['trash', 'recycling', 'yard_waste']),
+  route: z.string().trim().min(1, 'Route is required').max(100),
+  containerSize: z.string().trim().max(30).optional().nullable(),
+  dayOfWeek: z.number().int().min(0).max(6),
+})
+
+function normalizeContainerSize(value?: string | null) {
+  const cleaned = value?.trim()
+  if (!cleaned) return null
+  const match = cleaned.toLocaleLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:g|gal|gallon|gallons)?$/)
+  return match ? `${match[1]}g` : cleaned
+}
+
 export async function createCommunity(companySlug: string, data: { name: string; cityId: string }) {
   const session = await getSession()
   const user = getSessionUser(session)
@@ -58,4 +72,73 @@ export async function deleteCommunity(companySlug: string, communityId: string) 
     revalidatePath(`/${companySlug}/communities`)
     return { success: true }
   } catch { return { error: 'Failed to delete community' } }
+}
+
+export async function applyCommunityRouteAssignment(companySlug: string, communityId: string, input: unknown) {
+  const session = await getSession()
+  const user = getSessionUser(session)
+  if (!user || user.userType !== 'employee' || user.companySlug !== companySlug) return { error: 'Unauthorized' }
+  if (!['company_owner', 'company_admin', 'company_manager'].includes(user.role ?? '')) return { error: 'Insufficient permissions' }
+  const parsed = routeAssignmentSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid route assignment' }
+
+  const community = await prisma.community.findFirst({ where: { id: communityId, companyId: user.companyId! }, select: { id: true, name: true } })
+  if (!community) return { error: 'Community not found' }
+
+  const addresses = await prisma.address.findMany({ where: { companyId: user.companyId!, communityId }, select: { id: true } })
+  if (!addresses.length) return { error: 'This community has no addresses' }
+  const addressIds = addresses.map((address) => address.id)
+  const assignment = { ...parsed.data, containerSize: normalizeContainerSize(parsed.data.containerSize) }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.addressService.updateMany({
+      where: { addressId: { in: addressIds }, service: parsed.data.service },
+      data: { route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek },
+    })
+    await tx.addressService.createMany({
+      data: addressIds.map((addressId) => ({ addressId, service: assignment.service, route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek })),
+      skipDuplicates: true,
+    })
+  }, { timeout: 30000 })
+
+  await createAuditLog({
+    companyId: user.companyId,
+    actorId: user.id,
+    actorType: 'employee',
+    actorName: user.name,
+    action: 'bulk_route_assignment',
+    entityType: 'community',
+    entityId: communityId,
+    metadata: { ...parsed.data, addressCount: addressIds.length },
+  })
+  revalidatePath(`/${companySlug}/communities`)
+  revalidatePath(`/${companySlug}/addresses`)
+  revalidatePath(`/${companySlug}/my`)
+  revalidatePath(`/${companySlug}/my/service-schedules`)
+  return { success: true, updated: addressIds.length }
+}
+
+export async function removeCommunityServiceAssignment(companySlug: string, communityId: string, service: unknown) {
+  const session = await getSession()
+  const user = getSessionUser(session)
+  if (!user || user.userType !== 'employee' || user.companySlug !== companySlug) return { error: 'Unauthorized' }
+  if (!['company_owner', 'company_admin', 'company_manager'].includes(user.role ?? '')) return { error: 'Insufficient permissions' }
+  const parsedService = z.enum(['trash', 'recycling', 'yard_waste']).safeParse(service)
+  if (!parsedService.success) return { error: 'Invalid service' }
+  const community = await prisma.community.findFirst({ where: { id: communityId, companyId: user.companyId! }, select: { id: true } })
+  if (!community) return { error: 'Community not found' }
+
+  const removed = await prisma.addressService.deleteMany({
+    where: { service: parsedService.data, address: { companyId: user.companyId!, communityId } },
+  })
+  await createAuditLog({
+    companyId: user.companyId, actorId: user.id, actorType: 'employee', actorName: user.name,
+    action: 'bulk_service_removal', entityType: 'community', entityId: communityId,
+    metadata: { service: parsedService.data, assignmentCount: removed.count },
+  })
+  revalidatePath(`/${companySlug}/communities`)
+  revalidatePath(`/${companySlug}/addresses`)
+  revalidatePath(`/${companySlug}/my`)
+  revalidatePath(`/${companySlug}/my/service-schedules`)
+  return { success: true, removed: removed.count }
 }

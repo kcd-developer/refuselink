@@ -55,6 +55,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ companyS
 
   const where: Prisma.AddressWhereInput = {
     companyId: company.id,
+    claimedAt: null,
     address: { startsWith: houseNumber, mode: 'insensitive' },
   }
 

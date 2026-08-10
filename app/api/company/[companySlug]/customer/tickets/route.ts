@@ -4,6 +4,14 @@ import { NextResponse } from 'next/server'
 import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
 import { generateTicketNumber } from '@/lib/ticket-number'
+import { z } from 'zod'
+
+const ticketSchema = z.object({
+  subject: z.string().trim().min(1).max(200),
+  message: z.string().trim().min(1).max(5000),
+  customerId: z.string().min(1),
+  category: z.enum(['missed_pickup', 'recycling_issue', 'yard_waste_issue', 'cart_issue', 'illegal_dumping', 'community_cleanliness', 'service_delay', 'billing_account', 'other']),
+})
 
 export async function POST(req: Request, { params }: { params: Promise<{ companySlug: string }> }) {
   const resolvedParams = await params
@@ -13,12 +21,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { subject, message, customerId } = body ?? {}
-
-  if (!subject || !message || !customerId) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
-  }
+  const parsed = ticketSchema.safeParse(await req.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Invalid ticket' }, { status: 400 })
+  const { subject, message, customerId, category } = parsed.data
 
   // Verify customer belongs to company and user has access
   const access = await prisma.customerUserAccess.findFirst({
@@ -41,6 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
       customerId,
       ticketNumber,
       subject,
+      category,
       status: 'open',
       priority: 'normal',
       createdById: user.id,

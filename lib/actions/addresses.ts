@@ -10,21 +10,78 @@ import { formatStreetAddress, formatTitleCase } from '@/lib/text-format'
 
 const allowedRoles = ['company_owner', 'company_admin', 'company_manager']
 
+const serviceAssignmentSchema = z.object({
+  service: z.enum(['trash', 'recycling', 'yard_waste']),
+  route: z.string().trim().max(100).optional().nullable(),
+  containerSize: z.string().trim().max(30).optional().nullable(),
+  dayOfWeek: z.number().int().min(0).max(6),
+})
+
+const coordinateSchema = (
+  minimum: number,
+  maximum: number,
+  label: string,
+  allowedDirections: [string, string],
+) => z.preprocess((value) => {
+  if (value === '' || value === undefined || value === null) return null
+  if (typeof value === 'number') return value
+
+  const match = String(value).trim().toUpperCase().match(/^([+-]?\d+(?:\.\d+)?)\s*°?\s*([NSEW])?$/)
+  if (!match || (match[2] && !allowedDirections.includes(match[2]))) return Number.NaN
+  const magnitude = Number(match[1])
+  if (!match[2]) return magnitude
+  return allowedDirections.indexOf(match[2]) === 0 ? Math.abs(magnitude) : -Math.abs(magnitude)
+}, z.number({ invalid_type_error: `Enter a valid ${label.toLocaleLowerCase()}` })
+  .min(minimum, `${label} is out of range`)
+  .max(maximum, `${label} is out of range`)
+  .nullable())
+
 const addressSchema = z.object({
   address: z.string().trim().min(1, 'Street address is required').max(300),
   address2: z.string().trim().max(200).optional().nullable(),
   city: z.string().trim().min(1, 'City is required').max(100),
   state: z.string().trim().min(2, 'State is required').max(50),
   zipCode: z.string().trim().max(20).optional().nullable(),
+  latitude: coordinateSchema(-90, 90, 'Latitude', ['N', 'S']).optional(),
+  longitude: coordinateSchema(-180, 180, 'Longitude', ['E', 'W']).optional(),
+  latitudeDirection: z.string().trim().toUpperCase().refine((value) => value === 'N' || value === 'S', 'Latitude direction must be N or S').optional().or(z.literal('')),
+  longitudeDirection: z.string().trim().toUpperCase().refine((value) => value === 'E' || value === 'W', 'Longitude direction must be E or W').optional().or(z.literal('')),
   communityId: z.string().trim().optional().nullable(),
+  services: z.array(serviceAssignmentSchema).max(3).default([]),
 })
 
-const importRowSchema = addressSchema.omit({ communityId: true }).extend({
+const importRowSchema = addressSchema.omit({ communityId: true, services: true }).extend({
   community: z.string().trim().max(100).optional().nullable(),
+  trash: z.string().trim().optional(),
+  trashRoute: z.string().trim().max(100).optional(),
+  trashDay: z.string().trim().optional(),
+  trashContainerSize: z.string().trim().max(30).optional(),
+  recycle: z.string().trim().optional(),
+  recycleRoute: z.string().trim().max(100).optional(),
+  recycleDay: z.string().trim().optional(),
+  recycleContainerSize: z.string().trim().max(30).optional(),
+  yardWaste: z.string().trim().optional(),
+  yardWasteRoute: z.string().trim().max(100).optional(),
+  yardWasteDay: z.string().trim().optional(),
+  yardWasteContainerSize: z.string().trim().max(30).optional(),
 })
 
 export type AddressInput = z.infer<typeof addressSchema>
 export type AddressImportRow = z.infer<typeof importRowSchema>
+
+function coordinateWithDirection(value: unknown, direction: unknown) {
+  const coordinate = String(value ?? '').trim()
+  const compassDirection = String(direction ?? '').trim().toUpperCase()
+  return compassDirection ? `${coordinate} ${compassDirection}` : value
+}
+
+function parseAddressInput(data: AddressInput) {
+  return addressSchema.safeParse({
+    ...data,
+    latitude: coordinateWithDirection(data.latitude, data.latitudeDirection),
+    longitude: coordinateWithDirection(data.longitude, data.longitudeDirection),
+  })
+}
 
 async function authorize(companySlug: string) {
   const session = await getSession()
@@ -43,6 +100,13 @@ function cleanOptional(value?: string | null) {
   return cleaned ? cleaned : null
 }
 
+function normalizeContainerSize(value?: string | null) {
+  const cleaned = cleanOptional(value)
+  if (!cleaned) return null
+  const match = cleaned.toLocaleLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:g|gal|gallon|gallons)?$/)
+  return match ? `${match[1]}g` : cleaned
+}
+
 function normalizeLocation(city: string, state: string) {
   return { city: formatTitleCase(city), state: state.trim().toUpperCase() }
 }
@@ -51,6 +115,70 @@ function addressKey(data: { address: string; address2?: string | null; cityId: s
   return [data.address, data.address2 ?? '', data.cityId, data.zipCode ?? '']
     .map((value) => value.trim().toLocaleLowerCase())
     .join('|')
+}
+
+function importIdentityKey(data: { address: string; address2?: string | null; cityId: string }) {
+  return [data.address, data.address2 ?? '', data.cityId]
+    .map((value) => value.trim().toLocaleLowerCase())
+    .join('|')
+}
+
+const dayLookup: Record<string, number> = {
+  sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2,
+  wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4,
+  friday: 5, fri: 5, saturday: 6, sat: 6,
+}
+
+function parseDay(value?: string) {
+  if (!value?.trim()) return null
+  const normalized = value.trim().toLocaleLowerCase()
+  if (/^[0-6]$/.test(normalized)) return Number(normalized)
+  return dayLookup[normalized] ?? null
+}
+
+function isEnabled(value?: string) {
+  return ['1', 'true', 'yes', 'y', 'x'].includes(value?.trim().toLocaleLowerCase() ?? '')
+}
+
+function servicesFromImport(row: AddressImportRow) {
+  const definitions = [
+    { service: 'trash' as const, enabled: row.trash, route: row.trashRoute, day: row.trashDay, containerSize: row.trashContainerSize },
+    { service: 'recycling' as const, enabled: row.recycle, route: row.recycleRoute, day: row.recycleDay, containerSize: row.recycleContainerSize },
+    { service: 'yard_waste' as const, enabled: row.yardWaste, route: row.yardWasteRoute, day: row.yardWasteDay, containerSize: row.yardWasteContainerSize },
+  ]
+  const mentioned = definitions.filter((item) => item.enabled !== undefined || item.route !== undefined || item.day !== undefined || item.containerSize !== undefined)
+  if (!mentioned.length) return null
+
+  return mentioned.map((item) => {
+    const enabled = isEnabled(item.enabled) || Boolean(item.route?.trim()) || Boolean(item.day?.trim()) || Boolean(item.containerSize?.trim())
+    if (!enabled) return { service: item.service, assignment: null }
+    const dayOfWeek = parseDay(item.day)
+    if (dayOfWeek === null) throw new Error(`${item.service.replace('_', ' ')} requires a valid service day`)
+    return { service: item.service, assignment: { route: cleanOptional(item.route), containerSize: normalizeContainerSize(item.containerSize), dayOfWeek } }
+  })
+}
+
+async function applyImportedServices(tx: Prisma.TransactionClient, addressId: string, services: NonNullable<ReturnType<typeof servicesFromImport>>) {
+  for (const item of services) {
+    if (!item.assignment) {
+      await tx.addressService.deleteMany({ where: { addressId, service: item.service } })
+      continue
+    }
+    await tx.addressService.upsert({
+      where: { addressId_service: { addressId, service: item.service } },
+      create: { addressId, service: item.service, ...item.assignment },
+      update: item.assignment,
+    })
+  }
+}
+
+async function replaceServices(tx: Prisma.TransactionClient, addressId: string, services: z.infer<typeof serviceAssignmentSchema>[]) {
+  await tx.addressService.deleteMany({ where: { addressId } })
+  if (services.length) {
+    await tx.addressService.createMany({
+      data: services.map((service) => ({ addressId, service: service.service, route: cleanOptional(service.route), containerSize: normalizeContainerSize(service.containerSize), dayOfWeek: service.dayOfWeek })),
+    })
+  }
 }
 
 async function findOrCreateCity(tx: Prisma.TransactionClient, companyId: string, cityName: string, stateName: string) {
@@ -110,7 +238,7 @@ function revalidateAddressPaths(companySlug: string) {
 export async function createAddress(companySlug: string, data: AddressInput) {
   const auth = await authorize(companySlug)
   if ('error' in auth) return { error: auth.error }
-  const parsed = addressSchema.safeParse(data)
+  const parsed = parseAddressInput(data)
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid input' }
 
   try {
@@ -122,12 +250,15 @@ export async function createAddress(companySlug: string, data: AddressInput) {
         address2: cleanOptional(parsed.data.address2),
         cityId: cityResult.city.id,
         zipCode: cleanOptional(parsed.data.zipCode),
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
       }
       if (await findDuplicate(tx, auth.user.companyId!, addressData)) throw new Error('This address already exists')
 
       const address = await tx.address.create({
         data: { companyId: auth.user.companyId!, ...addressData, communityId },
       })
+      await replaceServices(tx, address.id, parsed.data.services)
       return { address, cityCreated: cityResult.created }
     })
 
@@ -142,7 +273,7 @@ export async function createAddress(companySlug: string, data: AddressInput) {
 export async function updateAddress(companySlug: string, addressId: string, data: AddressInput) {
   const auth = await authorize(companySlug)
   if ('error' in auth) return { error: auth.error }
-  const parsed = addressSchema.safeParse(data)
+  const parsed = parseAddressInput(data)
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid input' }
 
   try {
@@ -156,9 +287,12 @@ export async function updateAddress(companySlug: string, addressId: string, data
         address2: cleanOptional(parsed.data.address2),
         cityId: cityResult.city.id,
         zipCode: cleanOptional(parsed.data.zipCode),
+        latitude: parsed.data.latitude,
+        longitude: parsed.data.longitude,
       }
       if (await findDuplicate(tx, auth.user.companyId!, addressData, addressId)) throw new Error('This address already exists')
       await tx.address.update({ where: { id: addressId }, data: { ...addressData, communityId } })
+      await replaceServices(tx, addressId, parsed.data.services)
     })
 
     await logAddressAction(auth.user, 'update', addressId)
@@ -201,17 +335,22 @@ export async function importAddresses(companySlug: string, rows: AddressImportRo
 
       const existingAddresses = await tx.address.findMany({
         where: { companyId: auth.user.companyId! },
-        select: { address: true, address2: true, cityId: true, zipCode: true },
+        select: { id: true, address: true, address2: true, cityId: true, zipCode: true },
       })
-      const knownKeys = new Set(existingAddresses.map(addressKey))
+      const existingByKey = new Map(existingAddresses.map((address) => [importIdentityKey(address), address]))
       const cityCache = new Map<string, { id: string; created: boolean }>()
       const errors: string[] = []
-      const creates: Prisma.AddressCreateManyInput[] = []
+      let imported = 0
+      let updated = 0
       let skipped = 0
       let citiesCreated = 0
 
       for (let index = 0; index < rows.length; index += 1) {
-        const parsed = importRowSchema.safeParse(rows[index])
+        const parsed = importRowSchema.safeParse({
+          ...rows[index],
+          latitude: coordinateWithDirection(rows[index].latitude, rows[index].latitudeDirection),
+          longitude: coordinateWithDirection(rows[index].longitude, rows[index].longitudeDirection),
+        })
         if (!parsed.success) {
           skipped += 1
           errors.push(`Row ${index + 2}: ${parsed.error.errors[0]?.message ?? 'Invalid address'}`)
@@ -254,19 +393,45 @@ export async function importAddresses(companySlug: string, rows: AddressImportRo
           address2: parsed.data.address2 ? formatStreetAddress(parsed.data.address2) : null,
           cityId: cachedCity.id,
           zipCode: cleanOptional(parsed.data.zipCode),
+          latitude: parsed.data.latitude,
+          longitude: parsed.data.longitude,
         }
-        const key = addressKey(addressData)
-        if (knownKeys.has(key)) {
+        const key = importIdentityKey(addressData)
+        let services: ReturnType<typeof servicesFromImport>
+        try {
+          services = servicesFromImport(parsed.data)
+        } catch (error) {
           skipped += 1
-          errors.push(`Row ${index + 2}: Address already exists`)
+          errors.push(`Row ${index + 2}: ${error instanceof Error ? error.message : 'Invalid service assignment'}`)
           continue
         }
-        knownKeys.add(key)
-        creates.push({ companyId: auth.user.companyId!, ...addressData, communityId })
+
+        const existing = existingByKey.get(key)
+        if (existing) {
+          await tx.address.update({
+            where: { id: existing.id },
+            data: {
+              address: addressData.address,
+              address2: addressData.address2,
+              cityId: addressData.cityId,
+              ...(parsed.data.zipCode !== undefined ? { zipCode: addressData.zipCode } : {}),
+              ...(rows[index].latitude !== undefined ? { latitude: addressData.latitude } : {}),
+              ...(rows[index].longitude !== undefined ? { longitude: addressData.longitude } : {}),
+              ...(defaultCommunityId || parsed.data.community !== undefined ? { communityId } : {}),
+            },
+          })
+          if (services) await applyImportedServices(tx, existing.id, services)
+          updated += 1
+          continue
+        }
+
+        const created = await tx.address.create({ data: { companyId: auth.user.companyId!, ...addressData, communityId } })
+        existingByKey.set(key, created)
+        if (services) await applyImportedServices(tx, created.id, services)
+        imported += 1
       }
 
-      if (creates.length) await tx.address.createMany({ data: creates })
-      return { imported: creates.length, skipped, citiesCreated, errors: errors.slice(0, 25) }
+      return { imported, updated, skipped, citiesCreated, errors: errors.slice(0, 25) }
     }, { timeout: 30000 })
 
     await logAddressAction(auth.user, 'import', null, result)

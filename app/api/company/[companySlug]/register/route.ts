@@ -81,6 +81,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
 
   try {
     await prisma.$transaction(async (tx) => {
+      const claim = await tx.address.updateMany({
+        where: { id: matchedAddress.id, companyId: company.id, claimedAt: null },
+        data: { claimedAt: new Date() },
+      })
+      if (!claim.count) throw new AddressUnavailableError()
+
       const customerCandidates = await tx.customer.findMany({
         where: {
           companyId: company.id,
@@ -146,6 +152,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof AddressUnavailableError) {
+      return publicRegistrationError('We could not complete registration for that address. Please contact the office for help.', 409)
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return publicRegistrationError('An account already exists for this email. Please sign in.', 409)
     }
@@ -154,3 +163,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
     return publicRegistrationError('We could not create your account. Please try again.', 500)
   }
 }
+
+class AddressUnavailableError extends Error {}

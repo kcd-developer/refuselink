@@ -73,7 +73,14 @@ export const authOptions: NextAuthOptions = {
                   customer: { companyId: company.id },
                 },
               });
-              if (access) {
+              const communityMembership = access ? null : await prisma.communityMembership.findFirst({
+                where: {
+                  customerUserId: customerUser.id,
+                  isActive: true,
+                  community: { companyId: company.id },
+                },
+              });
+              if (access || communityMembership) {
                 return {
                   id: customerUser.id,
                   email: customerUser.email,

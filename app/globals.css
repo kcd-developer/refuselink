@@ -30,6 +30,64 @@
   }
 }
 
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.4in;
+  }
+
+  body.printing-community-map {
+    background: white !important;
+  }
+
+  body.printing-community-map * {
+    visibility: hidden;
+  }
+
+  body.printing-community-map .community-map-print-area,
+  body.printing-community-map .community-map-print-area * {
+    visibility: visible;
+  }
+
+  body.printing-community-map .community-map-print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  body.printing-community-map .community-map-print-controls {
+    display: none;
+  }
+
+  body.printing-community-map .community-map-screen-controls {
+    display: none;
+  }
+
+  body.printing-community-map .community-map-print-date {
+    display: block;
+    margin-top: 0.25rem;
+  }
+
+  body.printing-community-map .leaflet-container {
+    height: 6.7in !important;
+    border: 1px solid #cbd5e1;
+  }
+}
+
+.route-map-label {
+  border: 1px solid rgb(148 163 184 / 0.65) !important;
+  background: rgb(255 255 255 / 0.9) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.15) !important;
+  color: #0f172a !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 1px 4px !important;
+}
+
 @layer base {
   * {
     @apply border-border;

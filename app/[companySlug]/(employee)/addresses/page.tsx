@@ -22,6 +22,7 @@ export default async function AddressesPage({ params }: { params: Promise<{ comp
       include: {
         city: { select: { id: true, name: true, state: true } },
         community: { select: { id: true, name: true } },
+        services: { orderBy: { service: 'asc' } },
       },
       orderBy: [{ city: { name: 'asc' } }, { address: 'asc' }],
     }),

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, FileUp, Users, Search, Building, Home, Truck, Plus, X, Pencil } from 'lucide-react'
+import { Download, FileUp, Users, Search, Building, Home, Truck, Plus, X } from 'lucide-react'
 import { createCustomer, importCustomers, updateCustomer, type CustomerImportRow } from '@/lib/actions/customers'
 
 const typeIcons: Record<string, any> = { residential: Home, commercial: Building, roll_off: Truck }
@@ -174,6 +174,7 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState<any>(null)
+  const [formUnlocked, setFormUnlocked] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -183,17 +184,20 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ created: number; updated: number; skipped: number; addressesCreated: number; citiesCreated: number; errors: string[] } | null>(null)
 
-  const resetForm = () => { setShowForm(false); setEditing(null); setForm(emptyForm); setError('') }
+  const resetForm = () => { setShowForm(false); setEditing(null); setFormUnlocked(false); setForm(emptyForm); setError('') }
   const openCreateForm = () => {
     setShowImport(false)
     resetForm()
+    setFormUnlocked(true)
     setShowForm(true)
   }
   const startEdit = (c: any) => {
     setShowImport(false)
     setEditing(c)
+    setFormUnlocked(false)
     setForm({ type: c.type, name: c.name, contactName: c.contactName || '', email: c.email || '', phone: c.phone || '', address: c.address || '', address2: c.address2 || '', city: c.city || '', state: c.state || '', zipCode: c.zipCode || '', cityId: c.cityId || '', communityId: c.communityId || '', accountNumber: c.accountNumber || '', notes: c.notes || '' })
     setShowForm(true); setError('')
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
   }
   const updateField = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
 
@@ -201,6 +205,7 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (editing && !formUnlocked) return
     setLoading(true); setError('')
     const result = editing
       ? await updateCustomer(companySlug, editing.id, form)
@@ -264,9 +269,15 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
   }
 
   const filtered = (customers ?? []).filter((c: any) => {
+    const linkedUsers = (c?.userAccess ?? []).map((access: any) => access.customerUser)
     const matchesSearch = (c?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (c?.accountNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (c?.email ?? '').toLowerCase().includes(search.toLowerCase())
+      (c?.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      linkedUsers.some((user: any) =>
+        (user?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (user?.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (user?.phone ?? '').toLowerCase().includes(search.toLowerCase())
+      )
     const matchesType = typeFilter === 'all' || c?.type === typeFilter
     return matchesSearch && matchesType
   })
@@ -343,11 +354,12 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
       {showForm && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">{editing ? 'Edit Customer' : 'Add Customer'}</h3>
+            <h3 className="font-semibold text-slate-900">{editing ? formUnlocked ? 'Edit Customer' : 'Customer Details' : 'Add Customer'}</h3>
             <button onClick={resetForm} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4" /></button>
           </div>
           {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
+            <fieldset disabled={Boolean(editing) && !formUnlocked} className="space-y-4 disabled:opacity-75">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Type</label>
@@ -427,9 +439,15 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
               <label className="block text-xs font-medium text-slate-500 mb-1">Notes</label>
               <textarea value={form.notes} onChange={e => updateField('notes', e.target.value)} rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
             </div>
+            </fieldset>
             <div className="flex justify-end">
-              <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                {loading ? 'Saving...' : editing ? 'Update Customer' : 'Create Customer'}
+              <button
+                type={editing && !formUnlocked ? 'button' : 'submit'}
+                onClick={editing && !formUnlocked ? () => setFormUnlocked(true) : undefined}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : editing ? formUnlocked ? 'Update Customer' : 'Edit Customer' : 'Create Customer'}
               </button>
             </div>
           </form>
@@ -458,18 +476,40 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Account #</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Location</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-16"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {filtered.map((c: any) => {
               const Icon = typeIcons[c?.type] ?? Users
               return (
-                <tr key={c?.id} className="hover:bg-slate-50 transition-colors">
+                <tr
+                  key={c?.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => startEdit(c)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      startEdit(c)
+                    }
+                  }}
+                  className="cursor-pointer hover:bg-slate-50 focus:bg-blue-50 focus:outline-none transition-colors"
+                  aria-label={`Edit ${c?.name ?? 'customer'}`}
+                >
                   <td className="px-6 py-4">
                     <p className="text-sm font-medium text-slate-900">{c?.name ?? '-'}</p>
                     {c?.contactName && <p className="text-xs text-slate-400">Contact: {c.contactName}</p>}
                     {c?.email && <p className="text-xs text-slate-400">{c.email}</p>}
+                    {(c?.userAccess ?? []).length > 0 && (
+                      <div className="mt-2 border-l-2 border-blue-100 pl-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Portal Access</p>
+                        {(c.userAccess ?? []).map((access: any) => (
+                          <p key={access.id} className="text-xs text-slate-500">
+                            {access.customerUser?.name ?? 'Unknown user'} · {access.customerUser?.email ?? 'No email'}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-600">
@@ -485,14 +525,11 @@ export function CustomersClient({ customers, companySlug, cities, communities }:
                       {c?.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <button onClick={() => startEdit(c)} className="p-1.5 hover:bg-slate-100 rounded-md"><Pencil className="h-3.5 w-3.5 text-slate-400" /></button>
-                  </td>
                 </tr>
               )
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">No customers found</td></tr>
+              <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">No customers found</td></tr>
             )}
           </tbody>
         </table>

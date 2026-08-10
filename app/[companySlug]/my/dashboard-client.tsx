@@ -14,22 +14,26 @@ interface Props {
   accounts: any[]
   openTickets: number
   announcements: any[]
-  schedules: any[]
+  addressServices: any[]
 }
 
-export function CustomerDashboardClient({ userName, companySlug, primaryColor, paymentUrl, paymentLabel, accounts, openTickets, announcements, schedules }: Props) {
+const serviceLabels: Record<string, string> = { trash: 'Trash', recycling: 'Recycling', yard_waste: 'Yard Waste' }
+
+export function CustomerDashboardClient({ userName, companySlug, primaryColor, paymentUrl, paymentLabel, accounts, openTickets, announcements, addressServices }: Props) {
   // Find next scheduled day
   const today = new Date()
   const currentDay = today.getUTCDay()
   let nextServiceDay = ''
-  if ((schedules ?? []).length > 0) {
-    const allDays = (schedules ?? []).flatMap((s: any) => s?.daysOfWeek ?? [])
-    const uniqueDays = [...new Set(allDays)].sort((a: number, b: number) => a - b)
-    const next = uniqueDays.find((d: number) => d > currentDay) ?? uniqueDays[0]
-    if (next !== undefined) nextServiceDay = dayNames[next] ?? ''
+  const allServices = (addressServices ?? []).flatMap((item: any) => item.services ?? [])
+  if (allServices.length > 0) {
+    const next = [...allServices].sort((left: any, right: any) =>
+      ((left.dayOfWeek - currentDay + 7) % 7) - ((right.dayOfWeek - currentDay + 7) % 7)
+    )[0]
+    if (next) nextServiceDay = `${dayNames[next.dayOfWeek]} · ${serviceLabels[next.service] ?? next.service}`
   }
 
   const primaryAccount = (accounts ?? []).find((a: any) => a?.isPrimary)?.customer ?? (accounts ?? [])[0]?.customer
+  const primaryServices = (addressServices ?? []).find((item: any) => item.customerId === primaryAccount?.id)?.services ?? []
 
   return (
     <div>
@@ -72,6 +76,17 @@ export function CustomerDashboardClient({ userName, companySlug, primaryColor, p
               <div className="flex justify-between text-sm"><dt className="text-slate-500">Account #</dt><dd className="font-mono text-slate-900">{primaryAccount?.accountNumber ?? '-'}</dd></div>
               <div className="flex justify-between text-sm"><dt className="text-slate-500">Type</dt><dd className="capitalize text-slate-900">{primaryAccount?.type?.replace?.('_', ' ') ?? '-'}</dd></div>
               <div className="flex justify-between text-sm"><dt className="text-slate-500">Address</dt><dd className="text-slate-900">{primaryAccount?.address ?? '-'}</dd></div>
+              {primaryAccount?.community?.name && (
+                <div className="flex justify-between text-sm"><dt className="text-slate-500">Community</dt><dd className="font-medium text-slate-900">{primaryAccount.community.name}</dd></div>
+              )}
+              <div className="flex justify-between gap-4 text-sm">
+                <dt className="text-slate-500">Services</dt>
+                <dd className="text-right text-slate-900">
+                  {primaryServices.length ? primaryServices.map((service: any) => (
+                    <div key={service.service}>{serviceLabels[service.service] ?? service.service} · {dayNames[service.dayOfWeek]}{service.containerSize ? ` · ${service.containerSize}` : ''}</div>
+                  )) : 'Not assigned'}
+                </dd>
+              </div>
             </dl>
           </div>
         )}

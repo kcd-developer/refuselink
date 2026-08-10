@@ -1,21 +1,26 @@
-import { prisma } from '../lib/db'
+import { loadEnvConfig } from '@next/env'
 import { formatStreetAddress, formatTitleCase } from '../lib/text-format'
+
+loadEnvConfig(process.cwd())
 
 const companySlug = process.argv.find((argument) => !argument.startsWith('--') && argument !== process.argv[0] && argument !== process.argv[1])
 const applyChanges = process.argv.includes('--apply')
+let prisma: (typeof import('../lib/db'))['prisma'] | undefined
 
 async function main() {
   if (!companySlug) {
     throw new Error('Usage: npx tsx scripts/normalize-addresses.ts <company-slug> [--apply]')
   }
 
-  const company = await prisma.company.findUnique({ where: { slug: companySlug }, select: { id: true, name: true } })
+  const db = (await import('../lib/db')).prisma
+  prisma = db
+  const company = await db.company.findUnique({ where: { slug: companySlug }, select: { id: true, name: true } })
   if (!company) throw new Error(`Company not found: ${companySlug}`)
 
   const [addresses, customers, cities] = await Promise.all([
-    prisma.address.findMany({ where: { companyId: company.id }, select: { id: true, address: true, address2: true } }),
-    prisma.customer.findMany({ where: { companyId: company.id }, select: { id: true, address: true, address2: true, city: true } }),
-    prisma.city.findMany({ where: { companyId: company.id }, select: { id: true, name: true } }),
+    db.address.findMany({ where: { companyId: company.id }, select: { id: true, address: true, address2: true } }),
+    db.customer.findMany({ where: { companyId: company.id }, select: { id: true, address: true, address2: true, city: true } }),
+    db.city.findMany({ where: { companyId: company.id }, select: { id: true, name: true } }),
   ])
 
   const addressUpdates = addresses
@@ -40,13 +45,14 @@ async function main() {
     return
   }
 
-  await prisma.$transaction([
-    ...addressUpdates.map((record) => prisma.address.update({ where: { id: record.id }, data: { address: record.formattedAddress, address2: record.formattedAddress2 } })),
-    ...customerUpdates.map((record) => prisma.customer.update({ where: { id: record.id }, data: { address: record.formattedAddress, address2: record.formattedAddress2, city: record.formattedCity } })),
-    ...cityUpdates.map((record) => prisma.city.update({ where: { id: record.id }, data: { name: record.formattedName } })),
+  await db.$transaction([
+    ...addressUpdates.map((record) => db.address.update({ where: { id: record.id }, data: { address: record.formattedAddress, address2: record.formattedAddress2 } })),
+    ...customerUpdates.map((record) => db.customer.update({ where: { id: record.id }, data: { address: record.formattedAddress, address2: record.formattedAddress2, city: record.formattedCity } })),
+    ...cityUpdates.map((record) => db.city.update({ where: { id: record.id }, data: { name: record.formattedName } })),
   ])
 
   console.log('Address formatting updates applied.')
+
 }
 
 main()
@@ -54,4 +60,4 @@ main()
     console.error(error instanceof Error ? error.message : error)
     process.exitCode = 1
   })
-  .finally(async () => prisma.$disconnect())
+  .finally(async () => prisma?.$disconnect())

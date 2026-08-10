@@ -20,10 +20,11 @@ export default async function CustomerLayout({
     redirect(`/${resolvedParams.companySlug}/sign-in`)
   }
 
-  const company = await prisma.company.findUnique({
-    where: { slug: resolvedParams.companySlug },
-    include: { branding: true },
-  })
+  const [company, residentCommunity, membership] = await Promise.all([
+    prisma.company.findUnique({ where: { slug: resolvedParams.companySlug }, include: { branding: true } }),
+    prisma.customerUserAccess.findFirst({ where: { customerUserId: user.id, customer: { companyId: user.companyId!, communityId: { not: null } } }, select: { id: true } }),
+    prisma.communityMembership.findFirst({ where: { customerUserId: user.id, isActive: true, community: { companyId: user.companyId! } }, select: { id: true } }),
+  ])
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -32,6 +33,7 @@ export default async function CustomerLayout({
         companyName={company?.name ?? 'Company'}
         primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
         userName={user.name}
+        hasCommunityAccess={Boolean(residentCommunity || membership)}
       />
       <main className="max-w-5xl mx-auto px-4 py-8">
         {children}

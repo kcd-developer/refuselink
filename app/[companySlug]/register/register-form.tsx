@@ -311,8 +311,8 @@ export function CompanyRegisterForm({ companySlug, primaryColor }: Props) {
       </div>
 
       <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
-        Your address must already be on file with the company. Start with your house number, then select your
-        complete address when it appears. If it does not match, contact the office for help.
+        Start with your house number, then select your unclaimed service address when it appears. If your address
+        is not listed, contact the office for help.
       </div>
 
       <button

@@ -28,9 +28,19 @@ interface AddressRecord {
   address: string
   address2: string | null
   zipCode: string | null
+  latitude: number | null
+  longitude: number | null
   city: City
   community: { id: string; name: string } | null
+  services: Array<{ id: string; service: 'trash' | 'recycling' | 'yard_waste'; route: string | null; containerSize: string | null; dayOfWeek: number }>
 }
+
+const serviceTypes = [
+  { value: 'trash' as const, label: 'Trash' },
+  { value: 'recycling' as const, label: 'Recycling' },
+  { value: 'yard_waste' as const, label: 'Yard Waste' },
+]
+const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const emptyForm: AddressInput = {
   address: '',
@@ -38,7 +48,12 @@ const emptyForm: AddressInput = {
   city: '',
   state: '',
   zipCode: '',
+  latitude: null,
+  longitude: null,
+  latitudeDirection: 'N',
+  longitudeDirection: 'W',
   communityId: '',
+  services: [],
 }
 
 const headerAliases: Record<string, keyof AddressImportRow> = {
@@ -55,6 +70,35 @@ const headerAliases: Record<string, keyof AddressImportRow> = {
   zipcode: 'zipCode',
   postalcode: 'zipCode',
   community: 'community',
+  latitude: 'latitude',
+  lat: 'latitude',
+  latitudedirection: 'latitudeDirection',
+  latdirection: 'latitudeDirection',
+  longitude: 'longitude',
+  lon: 'longitude',
+  lng: 'longitude',
+  longitudedirection: 'longitudeDirection',
+  londirection: 'longitudeDirection',
+  lngdirection: 'longitudeDirection',
+  trash: 'trash',
+  trashroute: 'trashRoute',
+  trashday: 'trashDay',
+  trashcontainersize: 'trashContainerSize',
+  trashsize: 'trashContainerSize',
+  recycle: 'recycle',
+  recycling: 'recycle',
+  recycleroute: 'recycleRoute',
+  recyclingroute: 'recycleRoute',
+  recycleday: 'recycleDay',
+  recyclingday: 'recycleDay',
+  recyclecontainersize: 'recycleContainerSize',
+  recyclingcontainersize: 'recycleContainerSize',
+  recyclesize: 'recycleContainerSize',
+  yardwaste: 'yardWaste',
+  yardwasteroute: 'yardWasteRoute',
+  yardwasteday: 'yardWasteDay',
+  yardwastecontainersize: 'yardWasteContainerSize',
+  yardwastesize: 'yardWasteContainerSize',
 }
 
 function normalizeHeader(value: string) {
@@ -104,9 +148,9 @@ function csvToAddresses(text: string) {
   }
 
   return records.slice(1).map((record) => {
-    const row: AddressImportRow = { address: '', city: '', state: '', address2: '', zipCode: '', community: '' }
+    const row: AddressImportRow = { address: '', city: '', state: '' }
     mappedHeaders.forEach((header, index) => {
-      if (header) row[header] = record[index] ?? ''
+      if (header) (row as any)[header] = record[index] ?? ''
     })
     return row
   })
@@ -130,7 +174,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
   const [defaultCommunityId, setDefaultCommunityId] = useState('')
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; citiesCreated: number; errors: string[] } | null>(null)
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; skipped: number; citiesCreated: number; errors: string[] } | null>(null)
 
   const cityById = useMemo(() => new Map(cities.map((city) => [city.id, city])), [cities])
   const matchingCity = cities.find((city) =>
@@ -161,18 +205,37 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
       city: record.city.name,
       state: record.city.state,
       zipCode: record.zipCode ?? '',
+      latitude: record.latitude == null ? null : Math.abs(record.latitude),
+      longitude: record.longitude == null ? null : Math.abs(record.longitude),
+      latitudeDirection: record.latitude == null || record.latitude >= 0 ? 'N' : 'S',
+      longitudeDirection: record.longitude == null || record.longitude < 0 ? 'W' : 'E',
       communityId: record.community?.id ?? '',
+      services: record.services.map(({ service, route, containerSize, dayOfWeek }) => ({ service, route: route ?? '', containerSize: containerSize ?? '', dayOfWeek })),
     })
     setError('')
     setShowForm(true)
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
   }
 
-  const updateField = (field: keyof AddressInput, value: string) => {
+  const updateField = (field: keyof AddressInput, value: any) => {
     setForm((current) => ({
       ...current,
       [field]: value,
       ...((field === 'city' || field === 'state') ? { communityId: '' } : {}),
     }))
+  }
+
+  const updateService = (service: 'trash' | 'recycling' | 'yard_waste', enabled: boolean, field?: 'route' | 'containerSize' | 'dayOfWeek', value?: string) => {
+    setForm((current) => {
+      const existing = current.services.find((assignment) => assignment.service === service)
+      if (!enabled) return { ...current, services: current.services.filter((assignment) => assignment.service !== service) }
+      const assignment = existing ?? { service, route: '', containerSize: '', dayOfWeek: 1 }
+      const updated = field === 'dayOfWeek'
+        ? { ...assignment, dayOfWeek: Number(value) }
+        : field === 'route' ? { ...assignment, route: value }
+          : field === 'containerSize' ? { ...assignment, containerSize: value } : assignment
+      return { ...current, services: [...current.services.filter((item) => item.service !== service), updated] }
+    })
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -224,13 +287,13 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
       setImportError(result.error ?? 'Failed to import addresses')
       return
     }
-    setImportResult({ imported: result.imported, skipped: result.skipped, citiesCreated: result.citiesCreated, errors: result.errors })
+    setImportResult({ imported: result.imported, updated: result.updated, skipped: result.skipped, citiesCreated: result.citiesCreated, errors: result.errors })
     setImportRows([])
     setImportFileName('')
   }
 
   const downloadTemplate = () => {
-    const content = 'address,address2,city,state,zipCode,community\n123 Main St,,Kansas City,KS,66101,\n'
+    const content = 'address,address2,city,state,zipCode,community,latitude,latitudeDirection,longitude,longitudeDirection,trash,trashRoute,trashDay,trashContainerSize,recycle,recycleRoute,recycleDay,recycleContainerSize,yardWaste,yardWasteRoute,yardWasteDay,yardWasteContainerSize\n123 Main St,,Kansas City,KS,66101,Example HOA,39.0997,N,94.5786,W,yes,T-1,Monday,95g,yes,R-2,Thursday,65g,yes,Y-3,Tuesday,\n'
     const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }))
     const link = document.createElement('a')
     link.href = url
@@ -270,7 +333,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <h2 className="font-semibold text-slate-900">Import addresses from CSV</h2>
-              <p className="text-sm text-slate-500 mt-1">Required columns: address, city, state. Optional: address2, zipCode, community.</p>
+              <p className="text-sm text-slate-500 mt-1">Use the exact header names below, or download the ready-to-use template.</p>
             </div>
             <button onClick={() => setShowImport(false)} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4" /></button>
           </div>
@@ -278,10 +341,33 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
           {importError && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{importError}</div>}
           {importResult && (
             <div className="mb-4 p-4 bg-green-50 text-green-800 rounded-lg text-sm">
-              <p className="font-medium">Imported {importResult.imported} addresses. Skipped {importResult.skipped}. Created {importResult.citiesCreated} cities.</p>
+              <p className="font-medium">Added {importResult.imported} addresses. Updated {importResult.updated}. Skipped {importResult.skipped}. Created {importResult.citiesCreated} cities.</p>
               {importResult.errors.length > 0 && <ul className="mt-2 list-disc pl-5 space-y-1">{importResult.errors.map((message) => <li key={message}>{message}</li>)}</ul>}
             </div>
           )}
+
+          <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                <p className="font-semibold text-slate-800">Address headers</p>
+                <p className="mt-1"><span className="font-medium">Required:</span> <code>address</code>, <code>city</code>, <code>state</code></p>
+                <p className="mt-1"><span className="font-medium">Optional:</span> <code>address2</code>, <code>zipCode</code>, <code>community</code></p>
+                <p className="mt-1"><span className="font-medium">Coordinates:</span> <code>latitude</code>, <code>latitudeDirection</code>, <code>longitude</code>, <code>longitudeDirection</code></p>
+                <p className="mt-1 text-slate-500">Use N or S for latitude direction and E or W for longitude direction.</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-800">Service headers (all optional)</p>
+                <p className="mt-1"><code>trash</code>, <code>trashRoute</code>, <code>trashDay</code>, <code>trashContainerSize</code></p>
+                <p className="mt-1"><code>recycle</code>, <code>recycleRoute</code>, <code>recycleDay</code>, <code>recycleContainerSize</code></p>
+                <p className="mt-1"><code>yardWaste</code>, <code>yardWasteRoute</code>, <code>yardWasteDay</code>, <code>yardWasteContainerSize</code></p>
+              </div>
+            </div>
+            <div className="mt-4 border-t border-slate-200 pt-3 text-slate-500">
+              <p><span className="font-medium text-slate-700">Service:</span> use <code>yes</code> to enable or <code>no</code> to remove it. Days may be full names such as <code>Monday</code> or numbers 0–6 (Sunday–Saturday).</p>
+              <p className="mt-1"><span className="font-medium text-slate-700">Containers:</span> use values such as <code>95g</code>, <code>65g</code>, or <code>35g</code>. Leave the container-size cell blank when service is provided without a container, such as bagged Yard Waste.</p>
+              <p className="mt-1">Uploading an existing address updates its supplied service, route, day, container, coordinate, and community information without creating a duplicate.</p>
+            </div>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
             <div>
@@ -349,6 +435,47 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
                 </select>
               </div>
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Latitude (optional)</label>
+                <input type="text" inputMode="decimal" value={form.latitude ?? ''} onChange={(event) => updateField('latitude', event.target.value)} placeholder="38.99725" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Latitude Direction</label>
+                <select value={form.latitudeDirection ?? 'N'} onChange={(event) => updateField('latitudeDirection', event.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"><option value="N">N</option><option value="S">S</option></select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Longitude (optional)</label>
+                <input type="text" inputMode="decimal" value={form.longitude ?? ''} onChange={(event) => updateField('longitude', event.target.value)} placeholder="94.82948" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Longitude Direction</label>
+                <select value={form.longitudeDirection ?? 'W'} onChange={(event) => updateField('longitudeDirection', event.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm"><option value="E">E</option><option value="W">W</option></select>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500 mb-2">Services and route assignments</p>
+              <div className="space-y-2">
+                {serviceTypes.map((serviceType) => {
+                  const assignment = form.services.find((item) => item.service === serviceType.value)
+                  return (
+                    <div key={serviceType.value} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[140px_1fr_160px_180px] sm:items-center">
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <input type="checkbox" checked={Boolean(assignment)} onChange={(event) => updateService(serviceType.value, event.target.checked)} />
+                        {serviceType.label}
+                      </label>
+                      <input disabled={!assignment} value={assignment?.route ?? ''} onChange={(event) => updateService(serviceType.value, true, 'route', event.target.value)} placeholder="Route (Employees Only)" className="rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50" />
+                      <select disabled={!assignment} value={assignment?.containerSize ?? ''} onChange={(event) => updateService(serviceType.value, true, 'containerSize', event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
+                        <option value="">No Container</option><option value="35g">35g</option><option value="65g">65g</option><option value="95g">95g</option>
+                      </select>
+                      <select disabled={!assignment} value={assignment?.dayOfWeek ?? 1} onChange={(event) => updateService(serviceType.value, true, 'dayOfWeek', event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
+                        {dayNames.map((day, index) => <option key={day} value={index}>{day}</option>)}
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
             <div className="flex justify-end">
               <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {loading ? 'Saving...' : editing ? 'Update Address' : 'Create Address'}
@@ -371,12 +498,26 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">City / State</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">ZIP</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Community</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Services / Routes</th>
               <th className="px-6 py-3 w-24" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {filtered.map((record) => (
-              <tr key={record.id} className="hover:bg-slate-50">
+              <tr
+                key={record.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => startEdit(record)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    startEdit(record)
+                  }
+                }}
+                className="cursor-pointer hover:bg-slate-50 focus:bg-blue-50 focus:outline-none"
+                aria-label={`Edit ${record.address}`}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-start gap-2">
                     <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-none" />
@@ -386,15 +527,20 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
                 <td className="px-6 py-4 text-sm text-slate-600">{record.city.name}, {record.city.state}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{record.zipCode ?? '—'}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{record.community?.name ?? '—'}</td>
+                <td className="px-6 py-4 text-xs text-slate-600">
+                  {record.services.length ? record.services.map((service) => (
+                    <div key={service.id}><span className="font-medium capitalize">{service.service.replace('_', ' ')}</span>: {dayNames[service.dayOfWeek]}{service.route ? ` · ${service.route}` : ''}{service.containerSize ? ` · ${service.containerSize}` : ''}</div>
+                  )) : '—'}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex justify-end gap-1">
-                    <button onClick={() => startEdit(record)} className="p-1.5 hover:bg-slate-100 rounded-md" title="Edit address"><Pencil className="h-4 w-4 text-slate-400" /></button>
-                    <button onClick={() => handleDelete(record.id)} className="p-1.5 hover:bg-red-50 rounded-md" title="Delete address"><Trash2 className="h-4 w-4 text-red-400" /></button>
+                    <button onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); startEdit(record) }} className="p-1.5 hover:bg-slate-100 rounded-md" title="Edit address"><Pencil className="h-4 w-4 text-slate-400" /></button>
+                    <button onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); handleDelete(record.id) }} className="p-1.5 hover:bg-red-50 rounded-md" title="Delete address"><Trash2 className="h-4 w-4 text-red-400" /></button>
                   </div>
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">No addresses found</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">No addresses found</td></tr>}
           </tbody>
         </table>
       </div>

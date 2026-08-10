@@ -1,5 +1,6 @@
 import { DM_Sans, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import 'leaflet/dist/leaflet.css'
 import { Toaster } from '@/components/ui/sonner'
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 import { Providers } from './providers'

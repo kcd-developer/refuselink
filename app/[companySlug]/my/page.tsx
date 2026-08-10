@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { CustomerDashboardClient } from './dashboard-client'
+import { getCustomerAddressServices } from '@/lib/customer-address-services'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +31,11 @@ export default async function CustomerDashboardPage({ params }: { params: Promis
   })
 
   const customerIds = (access ?? []).map((a: any) => a?.customerId).filter(Boolean)
+  const primaryAccess = access.find((item) => item.isPrimary) ?? access[0]
+  const showPaymentLink = Boolean(primaryAccess) && !primaryAccess.customer.communityId
 
-  const [openTickets, announcements, schedules] = await Promise.all([
+  const customers = access.map((item) => item.customer)
+  const [openTickets, announcements, addressServices] = await Promise.all([
     prisma.ticket.count({
       where: { companyId: user.companyId ?? '', customerId: { in: customerIds }, status: { in: ['open', 'in_progress'] } },
     }),
@@ -40,10 +44,7 @@ export default async function CustomerDashboardPage({ params }: { params: Promis
       orderBy: { createdAt: 'desc' },
       take: 3,
     }),
-    prisma.serviceSchedule.findMany({
-      where: { companyId: user.companyId ?? '', isActive: true },
-      take: 5,
-    }),
+    getCustomerAddressServices(user.companyId ?? '', customers),
   ])
 
   return (
@@ -51,12 +52,12 @@ export default async function CustomerDashboardPage({ params }: { params: Promis
       userName={user.name}
       companySlug={resolvedParams.companySlug}
       primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
-      paymentUrl={company?.branding?.paymentUrl ?? null}
-      paymentLabel={company?.branding?.paymentLabel ?? null}
+      paymentUrl={showPaymentLink ? company?.branding?.paymentUrl ?? null : null}
+      paymentLabel={showPaymentLink ? company?.branding?.paymentLabel ?? null : null}
       accounts={JSON.parse(JSON.stringify(access ?? []))}
       openTickets={openTickets ?? 0}
       announcements={JSON.parse(JSON.stringify(announcements ?? []))}
-      schedules={JSON.parse(JSON.stringify(schedules ?? []))}
+      addressServices={JSON.parse(JSON.stringify(addressServices))}
     />
   )
 }

@@ -7,6 +7,7 @@ import {
   LayoutDashboard, User, Megaphone, FileText, Calendar,
   Ticket, LogOut, Menu, X
 } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -15,9 +16,10 @@ interface CustomerNavProps {
   companyName: string
   primaryColor?: string
   userName?: string
+  hasCommunityAccess?: boolean
 }
 
-export function CustomerNav({ companySlug, companyName, primaryColor, userName }: CustomerNavProps) {
+export function CustomerNav({ companySlug, companyName, primaryColor, userName, hasCommunityAccess }: CustomerNavProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const color = primaryColor ?? '#1D4ED8'
@@ -27,6 +29,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName }
     { href: `/${companySlug}/my/announcements`, label: 'Announcements', icon: Megaphone },
     { href: `/${companySlug}/my/documents`, label: 'Documents', icon: FileText },
     { href: `/${companySlug}/my/service-schedules`, label: 'Schedule', icon: Calendar },
+    ...(hasCommunityAccess ? [{ href: `/${companySlug}/my/community`, label: 'Community', icon: Building2 }] : []),
     { href: `/${companySlug}/my/tickets`, label: 'Tickets', icon: Ticket },
     { href: `/${companySlug}/my/profile`, label: 'Profile', icon: User },
   ]

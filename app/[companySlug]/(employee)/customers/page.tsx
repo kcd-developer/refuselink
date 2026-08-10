@@ -14,7 +14,14 @@ export default async function CustomersPage({ params }: { params: Promise<{ comp
   const [customers, cities, communities] = await Promise.all([
     prisma.customer.findMany({
       where: { companyId: user.companyId! },
-      include: { cityRef: { select: { name: true, state: true } }, community: { select: { name: true } } },
+      include: {
+        cityRef: { select: { name: true, state: true } },
+        community: { select: { name: true } },
+        userAccess: {
+          include: { customerUser: { select: { id: true, name: true, email: true, phone: true, isActive: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.city.findMany({ where: { companyId: user.companyId! }, select: { id: true, name: true, state: true }, orderBy: { name: 'asc' } }),
