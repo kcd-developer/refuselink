@@ -12,20 +12,48 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
 
   const ticket = await prisma.ticket.findFirst({
     where: { id: resolvedParams.id, companyId: user.companyId ?? '' },
+    include: { customer: { select: { communityId: true, userAccess: { where: { customerUserId: user.id }, select: { id: true }, take: 1 } } } },
   })
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await req.json()
-  const message = await prisma.ticketMessage.create({
+  const requestedManagerContext = body?.authorContext === 'community_manager'
+  let authorized = false
+  let authorType: string = user.userType
+  if (user.userType === 'employee') authorized = ticket.serviceRecipient === 'company'
+  if (user.userType === 'customer') {
+    if (requestedManagerContext && ticket.serviceRecipient === 'community_manager' && ticket.customer.communityId) {
+      authorized = Boolean(await prisma.communityMembership.findFirst({
+        where: { communityId: ticket.customer.communityId, customerUserId: user.id, role: 'community_manager', isActive: true },
+        select: { id: true },
+      }))
+      if (authorized) authorType = 'community_manager'
+    } else {
+      authorized = ticket.customer.userAccess.length > 0
+      authorType = 'customer'
+    }
+  }
+  if (!authorized) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const isInternal = body?.isInternal ?? false
+  const createMessage = prisma.ticketMessage.create({
     data: {
       ticketId: ticket.id,
       content: body?.content ?? '',
       authorId: user.id,
-      authorType: user.userType,
+      authorType,
       authorName: user.name,
-      isInternal: body?.isInternal ?? false,
+      isInternal,
     },
   })
+  const readReceiptUpdate = !isInternal
+    ? authorType === 'customer'
+      ? prisma.managerTicketRead.deleteMany({ where: { ticketId: ticket.id } })
+      : prisma.customerTicketRead.deleteMany({ where: { ticketId: ticket.id } })
+    : null
+  const [message] = readReceiptUpdate
+    ? await prisma.$transaction([createMessage, readReceiptUpdate])
+    : [await createMessage]
 
   return NextResponse.json(message)
 }

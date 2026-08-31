@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Save, Lock, Home, Building, Truck } from 'lucide-react'
+import { User, Save, Lock, Home, Building, Truck, Eye, EyeOff } from 'lucide-react'
 import { updateCustomerProfile, updateCustomerPassword } from '@/lib/actions/profile'
 
 const typeIcons: Record<string, any> = { residential: Home, commercial: Building, roll_off: Truck }
@@ -14,6 +14,8 @@ export function ProfileClient({ customerUser, companySlug }: { customerUser: any
   const [message, setMessage] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMessage, setPwMessage] = useState('')
 
@@ -70,11 +72,21 @@ export function ProfileClient({ customerUser, companySlug }: { customerUser: any
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Current Password</label>
-            <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <div className="relative">
+              <input type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required autoComplete="current-password" className="w-full py-2 pl-3 pr-11 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <button type="button" onClick={() => setShowCurrentPassword((current) => !current)} className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'} aria-pressed={showCurrentPassword}>
+                {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">New Password (min 8 characters)</label>
-            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <div className="relative">
+              <input type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" className="w-full py-2 pl-3 pr-11 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <button type="button" onClick={() => setShowNewPassword((current) => !current)} className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={showNewPassword ? 'Hide new password' : 'Show new password'} aria-pressed={showNewPassword}>
+                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <button type="submit" disabled={pwSaving} className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50">
             <Lock className="h-4 w-4" /> {pwSaving ? 'Changing...' : 'Change Password'}

@@ -95,6 +95,34 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  button:not(:disabled),
+  [data-pressable="true"] {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform, translate, scale, filter;
+    transition-duration: 100ms;
+    transition-timing-function: ease-out;
+  }
+
+  button:not(:disabled):active,
+  [data-pressable="true"]:active {
+    translate: 0 1px;
+    scale: 0.94;
+    filter: brightness(0.88);
+    box-shadow: inset 0 2px 4px rgb(15 23 42 / 0.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled),
+  [data-pressable="true"] {
+    transition-duration: 0ms;
+  }
+
+  button:not(:disabled):active,
+  [data-pressable="true"]:active {
+    translate: 0;
+    scale: 1;
+  }
 }
 
 [data-hydration-error] {

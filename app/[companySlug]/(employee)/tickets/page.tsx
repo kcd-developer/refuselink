@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { TicketsClient } from './tickets-client'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,11 +15,11 @@ export default async function TicketsPage({ params }: { params: Promise<{ compan
   const tickets = await prisma.ticket.findMany({
     where: { companyId: user.companyId ?? '' },
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, community: { select: { name: true } } } },
       assignedTo: { select: { name: true } },
     },
     orderBy: { updatedAt: 'desc' },
   })
 
-  return <TicketsClient tickets={JSON.parse(JSON.stringify(tickets ?? []))} companySlug={resolvedParams.companySlug} />
+  return <><AutoRefresh /><TicketsClient tickets={JSON.parse(JSON.stringify(tickets ?? []))} companySlug={resolvedParams.companySlug} /></>
 }

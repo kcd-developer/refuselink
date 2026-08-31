@@ -16,12 +16,12 @@ export default async function EmployeeDashboardPage({ params }: { params: Promis
   const [ticketCounts, customerCount, recentTickets, announcements] = await Promise.all([
     prisma.ticket.groupBy({
       by: ['status'],
-      where: { companyId },
+      where: { companyId, serviceRecipient: 'company' },
       _count: true,
     }),
     prisma.customer.count({ where: { companyId, isActive: true } }),
     prisma.ticket.findMany({
-      where: { companyId },
+      where: { companyId, serviceRecipient: 'company' },
       orderBy: { updatedAt: 'desc' },
       take: 5,
       include: { customer: { select: { name: true } }, assignedTo: { select: { name: true } } },

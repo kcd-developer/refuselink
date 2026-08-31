@@ -15,7 +15,7 @@ const statusLabels: Record<string, string> = {
   resolved: 'Resolved', closed: 'Closed',
 }
 
-export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { tickets: any[]; companySlug: string; customerIds: string[] }) {
+export function CustomerTicketsClient({ tickets, companySlug, customerIds, requestRecipient, communityName }: { tickets: any[]; companySlug: string; customerIds: string[]; requestRecipient: 'company' | 'community_manager'; communityName: string | null }) {
   const [showCreate, setShowCreate] = useState(false)
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState('missed_pickup')
@@ -59,6 +59,13 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { t
             <button onClick={() => setShowCreate(false)} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4" /></button>
           </div>
           {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
+          <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            {category === 'billing_account'
+              ? 'Billing and account questions are sent privately to KC Disposal.'
+              : requestRecipient === 'community_manager'
+                ? `This request will be sent to ${communityName ? `${communityName}'s` : 'your'} Community Manager. They can escalate it to KC Disposal if needed.`
+                : 'This request will be sent directly to KC Disposal.'}
+          </div>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Issue Type *</label>
@@ -93,10 +100,10 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds }: { t
 
       <div className="space-y-3">
         {tickets.map((t: any) => (
-          <Link key={t.id} href={`/${companySlug}/my/tickets/${t.id}`} className="block bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow">
+          <Link key={t.id} href={`/${companySlug}/my/tickets/${t.id}`} className={`block rounded-xl bg-white p-5 shadow-sm border hover:shadow-md transition-shadow ${t._count?.messages > 0 && !t.customerReads?.length ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'}`}>
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-medium text-slate-900 text-sm">{t.subject}</h3>
+                <div className="flex items-center gap-2"><h3 className="font-medium text-slate-900 text-sm">{t.subject}</h3>{t._count?.messages > 0 && !t.customerReads?.length && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New response</span>}</div>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs font-mono text-slate-400">{t.ticketNumber}</span>
                   <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[t.status] ?? ''}`}>

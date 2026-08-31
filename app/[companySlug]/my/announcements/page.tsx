@@ -1,63 +1,134 @@
 import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
-import { Megaphone, AlertTriangle, Info, AlertCircle } from 'lucide-react'
+import { getCustomerViewContext } from '@/lib/customer-view'
+import { CustomerAnnouncementsClient } from './announcements-client'
+import { getCustomerCompany } from '@/lib/customer-company'
+import { MarkAnnouncementsRead } from './mark-announcements-read'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CustomerAnnouncementsPage({ params }: { params: Promise<{ companySlug: string }> }) {
-  const resolvedParams = await params
-  const session = await getSession()
-  const user = getSessionUser(session)
-  if (!user || user.userType !== 'customer') redirect(`/${resolvedParams.companySlug}/sign-in`)
+  const { companySlug } = await params
+  const user = getSessionUser(await getSession())
+  if (!user || user.userType !== 'customer' || user.companySlug !== companySlug || !user.companyId) redirect(`/${companySlug}/sign-in`)
 
-  const announcements = await prisma.announcement.findMany({
-    where: { companyId: user.companyId ?? '', isPublished: true },
-    orderBy: { createdAt: 'desc' },
-  })
+  const [viewContext, company, accountAccess] = await Promise.all([
+    getCustomerViewContext({ userId: user.id, companyId: user.companyId, companySlug }),
+    getCustomerCompany(user.companyId),
+    prisma.customerUserAccess.findMany({
+      where: { customerUserId: user.id, customer: { companyId: user.companyId } },
+      select: { customer: { select: { type: true, cityId: true, communityId: true } } },
+    }),
+  ])
 
-  const priorityConfig: Record<string, { color: string; icon: any }> = {
-    low: { color: 'bg-slate-50 text-slate-600', icon: Info },
-    normal: { color: 'bg-blue-50 text-blue-600', icon: Info },
-    high: { color: 'bg-orange-50 text-orange-600', icon: AlertTriangle },
-    urgent: { color: 'bg-red-50 text-red-600', icon: AlertCircle },
-  }
+  const accountTypes = [...new Set(accountAccess.map((item) => item.customer.type))]
+  const cityIds = [...new Set(accountAccess.map((item) => item.customer.cityId).filter(Boolean))] as string[]
+  const residentCommunityIds = [...new Set(accountAccess.map((item) => item.customer.communityId).filter(Boolean))] as string[]
+  const managerCommunities = viewContext.managerCommunities
+  const boardCommunities = viewContext.options
+    .filter((option) => option.mode === 'board' && option.communityId && option.communityName)
+    .map((option) => ({ id: option.communityId!, name: option.communityName! }))
+  const visibleCommunityIds = viewContext.active.mode === 'resident'
+    ? residentCommunityIds
+    : viewContext.active.mode === 'board'
+      ? boardCommunities.map((community) => community.id)
+      : viewContext.active.allCommunities
+      ? managerCommunities.map((community) => community.id)
+      : viewContext.active.communityId ? [viewContext.active.communityId] : []
+  const creationCommunities = viewContext.active.mode === 'resident'
+    ? []
+    : viewContext.active.mode === 'board'
+      ? boardCommunities
+      : viewContext.active.allCommunities
+      ? managerCommunities
+      : viewContext.active.communityId && viewContext.active.communityName
+        ? [{ id: viewContext.active.communityId, name: viewContext.active.communityName }]
+        : []
+
+  const audienceFilters: any[] = [{ targetAll: true }]
+  if (accountTypes.length) audienceFilters.push({ targetTypes: { hasSome: accountTypes } })
+  if (cityIds.length) audienceFilters.push({ targetCityIds: { hasSome: cityIds } })
+  if (residentCommunityIds.length) audienceFilters.push({ targetCommunityIds: { hasSome: residentCommunityIds } })
+  const now = new Date()
+
+  const [companyAnnouncements, communityAnnouncements] = await Promise.all([
+    prisma.announcement.findMany({
+      where: {
+        companyId: user.companyId,
+        isPublished: true,
+        startDate: { lte: now },
+        AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }, { OR: audienceFilters }],
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    visibleCommunityIds.length ? prisma.communityAnnouncement.findMany({
+      where: {
+        companyId: user.companyId,
+        communityId: { in: visibleCommunityIds },
+        ...(viewContext.active.mode === 'resident'
+          ? { isPublished: true, startDate: { lte: now }, OR: [{ endDate: null }, { endDate: { gte: now } }] }
+          : { OR: [
+              { isPublished: false },
+              { isPublished: true, startDate: { lte: now }, AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }] },
+            ] }),
+      },
+      include: {
+        community: { select: { name: true } },
+        createdBy: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }) : [],
+  ])
+
+  const feed = [
+    ...companyAnnouncements.map((announcement) => ({
+      id: announcement.id,
+      sourceType: 'company' as const,
+      sourceKey: 'company',
+      sourceLabel: company?.name ?? 'Service Company',
+      communityId: null,
+      title: announcement.title,
+      content: announcement.content,
+      priority: announcement.priority,
+      startDate: announcement.startDate.toISOString(),
+      endDate: announcement.endDate?.toISOString() ?? null,
+      createdAt: announcement.createdAt.toISOString(),
+      authorName: null,
+      canManage: false,
+    })),
+    ...communityAnnouncements.map((announcement) => ({
+      id: announcement.id,
+      sourceType: 'community' as const,
+      sourceKey: `community:${announcement.communityId}`,
+      sourceLabel: announcement.community.name,
+      communityId: announcement.communityId,
+      title: announcement.title,
+      content: announcement.content,
+      priority: announcement.priority,
+      startDate: announcement.startDate.toISOString(),
+      endDate: announcement.endDate?.toISOString() ?? null,
+      createdAt: announcement.createdAt.toISOString(),
+      authorName: announcement.createdBy.name,
+      isPublished: announcement.isPublished,
+      canManage: viewContext.active.mode !== 'resident',
+    })),
+  ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-slate-900 tracking-tight">Announcements</h1>
-        <p className="text-sm text-slate-500 mt-1">Stay informed about service updates</p>
-      </div>
-
-      <div className="space-y-4">
-        {(announcements ?? []).map((ann: any) => {
-          const pc = priorityConfig[ann?.priority] ?? priorityConfig.normal
-          const PIcon = pc?.icon ?? Info
-          return (
-            <div key={ann?.id} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-start gap-3">
-                <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${pc?.color?.split?.(' ')?.[0] ?? 'bg-slate-50'}`}>
-                  <PIcon className={`h-5 w-5 ${pc?.color?.split?.(' ')?.[1] ?? 'text-slate-600'}`} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">{ann?.title ?? '-'}</h3>
-                  <p className="text-sm text-slate-600 mt-2 whitespace-pre-wrap">{ann?.content ?? ''}</p>
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-3 ${pc?.color ?? 'bg-slate-100 text-slate-500'}`}>
-                    {ann?.priority ?? 'normal'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-        {(announcements ?? []).length === 0 && (
-          <div className="bg-white rounded-xl p-12 shadow-sm border border-slate-200 text-center">
-            <Megaphone className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">No announcements at this time</p>
-          </div>
-        )}
-      </div>
-    </div>
+    <>
+      <MarkAnnouncementsRead
+        companySlug={companySlug}
+        companyAnnouncementIds={companyAnnouncements.map((announcement) => announcement.id)}
+        communityAnnouncementIds={communityAnnouncements.filter((announcement) => announcement.isPublished).map((announcement) => announcement.id)}
+      />
+      <CustomerAnnouncementsClient
+      companySlug={companySlug}
+      companyName={company?.name ?? 'Service Company'}
+      announcements={feed}
+      creationCommunities={creationCommunities}
+      canCreate={viewContext.active.mode !== 'resident' && creationCommunities.length > 0}
+      />
+    </>
   )
 }

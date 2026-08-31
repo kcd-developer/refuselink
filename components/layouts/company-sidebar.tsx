@@ -69,6 +69,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
             <Link
               key={item.href}
               href={item.href}
+              data-pressable="true"
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                 isActive

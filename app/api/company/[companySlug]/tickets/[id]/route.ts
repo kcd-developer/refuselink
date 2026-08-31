@@ -15,14 +15,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ compan
 
   const body = await req.json()
   const data: any = {}
+  if (body?.takeOwnership === true) {
+    data.serviceRecipient = 'company'
+    data.escalatedAt = new Date()
+  }
   if (body?.status) data.status = body.status
   if (body?.assignedToId !== undefined) data.assignedToId = body.assignedToId || null
   if (body?.priority) data.priority = body.priority
 
   const ticket = await prisma.ticket.updateMany({
-    where: { id: resolvedParams.id, companyId: user.companyId ?? '' },
+    where: {
+      id: resolvedParams.id,
+      companyId: user.companyId ?? '',
+      ...(body?.takeOwnership === true ? {} : { serviceRecipient: 'company' }),
+    },
     data,
   })
+
+  if (body?.takeOwnership === true && ticket.count) {
+    await prisma.$transaction([
+      prisma.ticketMessage.create({ data: { ticketId: resolvedParams.id, content: 'KC Disposal has taken over this request from the Community Manager.', authorId: user.id, authorType: 'employee', authorName: user.name } }),
+      prisma.customerTicketRead.deleteMany({ where: { ticketId: resolvedParams.id } }),
+    ])
+  }
 
   await createAuditLog({
     companyId: user.companyId,

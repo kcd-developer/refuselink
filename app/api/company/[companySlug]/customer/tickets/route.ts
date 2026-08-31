@@ -32,6 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
       customerId,
       customer: { companyId: user.companyId ?? '' },
     },
+    include: { customer: { select: { community: { select: { serviceIssueRouting: true, memberships: { where: { role: 'community_manager', isActive: true }, select: { id: true }, take: 1 } } } } } },
   })
 
   if (!access) {
@@ -39,6 +40,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
   }
 
   const ticketNumber = await generateTicketNumber(user.companyId ?? '')
+  const serviceRecipient = category !== 'billing_account' && access.customer.community?.serviceIssueRouting === 'community_manager' && access.customer.community.memberships.length > 0
+    ? 'community_manager'
+    : 'company'
 
   const ticket = await prisma.ticket.create({
     data: {
@@ -49,6 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
       category,
       status: 'open',
       priority: 'normal',
+      serviceRecipient,
       createdById: user.id,
       createdByType: 'customer',
       messages: {
@@ -62,5 +67,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
     },
   })
 
-  return NextResponse.json(ticket)
+  return NextResponse.json({ ...ticket, serviceRecipient })
 }

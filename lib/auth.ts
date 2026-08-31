@@ -1,7 +1,33 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
+
+type AuthFailureReason =
+  | "missing_credentials"
+  | "account_not_found"
+  | "account_inactive"
+  | "password_mismatch"
+  | "company_unavailable"
+  | "company_access_missing"
+  | "invalid_login_context";
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function logAuthFailure(reason: AuthFailureReason, email?: string, companySlug?: string) {
+  const emailFingerprint = email
+    ? createHash("sha256").update(normalizeEmail(email)).digest("hex").slice(0, 12)
+    : undefined;
+
+  console.warn("Authentication rejected", {
+    reason,
+    companySlug: companySlug || undefined,
+    emailFingerprint,
+  });
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,15 +41,29 @@ export const authOptions: NextAuthOptions = {
         companySlug: { label: "Company Slug", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-        const { email, password, loginType, companySlug } = credentials;
+        if (!credentials?.email || !credentials?.password) {
+          logAuthFailure("missing_credentials");
+          return null;
+        }
+        const email = normalizeEmail(credentials.email);
+        const { password, loginType, companySlug } = credentials;
 
         // Platform sign-in (also default if no loginType)
         if (loginType === "platform" || !loginType) {
           const user = await prisma.platformUser.findUnique({ where: { email } });
-          if (!user || !user.isActive) return null;
+          if (!user) {
+            logAuthFailure("account_not_found", email);
+            return null;
+          }
+          if (!user.isActive) {
+            logAuthFailure("account_inactive", email);
+            return null;
+          }
           const valid = await bcrypt.compare(password, user.password);
-          if (!valid) return null;
+          if (!valid) {
+            logAuthFailure("password_mismatch", email);
+            return null;
+          }
           return {
             id: user.id,
             email: user.email,
@@ -38,7 +78,10 @@ export const authOptions: NextAuthOptions = {
           const company = await prisma.company.findUnique({
             where: { slug: companySlug },
           });
-          if (!company || company.status === "suspended" || company.status === "cancelled") return null;
+          if (!company || company.status === "suspended" || company.status === "cancelled") {
+            logAuthFailure("company_unavailable", email, companySlug);
+            return null;
+          }
 
           // Try employee first
           const employee = await prisma.companyUser.findUnique({
@@ -90,11 +133,24 @@ export const authOptions: NextAuthOptions = {
                   companySlug: company.slug,
                 } as any;
               }
+              logAuthFailure("company_access_missing", email, companySlug);
+              return null;
             }
           }
+          const matchingAccounts = [employee, customerUser].filter(Boolean);
+          logAuthFailure(
+            matchingAccounts.length === 0
+              ? "account_not_found"
+              : matchingAccounts.every((account) => !account?.isActive)
+                ? "account_inactive"
+                : "password_mismatch",
+            email,
+            companySlug,
+          );
           return null;
         }
 
+        logAuthFailure("invalid_login_context", email, companySlug);
         return null;
       },
     }),

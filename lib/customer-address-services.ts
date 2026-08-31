@@ -10,9 +10,10 @@ interface CustomerAddress {
 
 export async function getCustomerAddressServices(companyId: string, customers: CustomerAddress[]) {
   if (!customers.length) return []
+  const cityIds = [...new Set(customers.map((customer) => customer.cityId).filter(Boolean))] as string[]
 
   const addresses = await prisma.address.findMany({
-    where: { companyId, services: { some: {} } },
+    where: { companyId, cityId: { in: cityIds }, services: { some: {} } },
     select: {
       id: true,
       address: true,

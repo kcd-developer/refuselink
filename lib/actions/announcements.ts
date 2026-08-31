@@ -52,6 +52,8 @@ export async function createAnnouncement(companySlug: string, data: any) {
       await createAuditLog({ companyId: user.companyId, actorId: user.id, actorType: 'employee', actorName: user.name, action: 'publish', entityType: 'announcement', entityId: ann.id })
     }
     revalidatePath(`/${companySlug}/announcements`)
+    revalidatePath(`/${companySlug}/my/announcements`)
+    revalidatePath(`/${companySlug}/my`)
     return { success: true, announcement: ann }
   } catch { return { error: 'Failed to create announcement' } }
 }
@@ -81,6 +83,8 @@ export async function updateAnnouncement(companySlug: string, announcementId: st
       },
     })
     revalidatePath(`/${companySlug}/announcements`)
+    revalidatePath(`/${companySlug}/my/announcements`)
+    revalidatePath(`/${companySlug}/my`)
     return { success: true }
   } catch { return { error: 'Failed to update announcement' } }
 }
@@ -93,6 +97,8 @@ export async function deleteAnnouncement(companySlug: string, announcementId: st
   try {
     await prisma.announcement.delete({ where: { id: announcementId, companyId: user.companyId! } })
     revalidatePath(`/${companySlug}/announcements`)
+    revalidatePath(`/${companySlug}/my/announcements`)
+    revalidatePath(`/${companySlug}/my`)
     return { success: true }
   } catch { return { error: 'Failed to delete announcement' } }
 }

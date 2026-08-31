@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Mail, Lock, LogIn } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react'
 
 interface Props {
   companySlug: string
@@ -14,6 +14,7 @@ interface Props {
 export function CompanySignInForm({ companySlug, primaryColor }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -62,6 +63,10 @@ export function CompanySignInForm({ companySlug, primaryColor }: Props) {
             type="email" required
             value={email}
             onChange={(e: any) => setEmail(e.target.value)}
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:border-blue-500 outline-none"
             style={{ '--tw-ring-color': primaryColor } as any}
             placeholder="you@example.com"
@@ -73,12 +78,22 @@ export function CompanySignInForm({ companySlug, primaryColor }: Props) {
         <div className="relative">
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
-            type="password" required
+            type={showPassword ? 'text' : 'password'} required
             value={password}
             onChange={(e: any) => setPassword(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:border-blue-500 outline-none"
+            autoComplete="current-password"
+            className="w-full pl-10 pr-11 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:border-blue-500 outline-none"
             placeholder="Enter your password"
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
       </div>
       <button

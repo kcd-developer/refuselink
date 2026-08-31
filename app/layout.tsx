@@ -4,6 +4,9 @@ import 'leaflet/dist/leaflet.css'
 import { Toaster } from '@/components/ui/sonner'
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 import { Providers } from './providers'
+import { Suspense } from 'react'
+import { NavigationLoadingOverlay } from '@/components/navigation-loading-overlay'
+import { PwaRegistration } from '@/components/pwa-registration'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,8 +37,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${dmSans.variable} ${jakartaSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <Providers>
           {children}
+          <Suspense fallback={null}>
+            <NavigationLoadingOverlay />
+          </Suspense>
           <Toaster />
           <ChunkLoadErrorHandler />
+          <PwaRegistration />
         </Providers>
       </body>
     </html>

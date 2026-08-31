@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { redirect, notFound } from 'next/navigation'
 import { TicketDetailClient } from './ticket-detail-client'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,12 +32,12 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ c
   })
 
   return (
-    <TicketDetailClient
+    <><AutoRefresh /><TicketDetailClient
       ticket={JSON.parse(JSON.stringify(ticket))}
       employees={JSON.parse(JSON.stringify(employees ?? []))}
       companySlug={resolvedParams.companySlug}
       currentUserId={user.id}
       currentUserName={user.name}
-    />
+    /></>
   )
 }

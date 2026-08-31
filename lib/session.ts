@@ -1,9 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { cache } from "react";
 
-export async function getSession() {
-  return getServerSession(authOptions);
-}
+// Layouts and pages frequently need the same session during one render. React's
+// request cache prevents each caller from repeating the auth/database work.
+export const getSession = cache(() => getServerSession(authOptions));
 
 export interface SessionUser {
   id: string;

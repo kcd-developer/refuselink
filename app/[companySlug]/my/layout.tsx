@@ -1,7 +1,10 @@
-import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import { CustomerNav } from '@/components/layouts/customer-nav'
+import { getCustomerViewContext } from '@/lib/customer-view'
+import { getCustomerCompany } from '@/lib/customer-company'
+import { prisma } from '@/lib/db'
+import { getUnreadAnnouncementCount } from '@/lib/customer-announcement-notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,10 +23,31 @@ export default async function CustomerLayout({
     redirect(`/${resolvedParams.companySlug}/sign-in`)
   }
 
-  const [company, residentCommunity, membership] = await Promise.all([
-    prisma.company.findUnique({ where: { slug: resolvedParams.companySlug }, include: { branding: true } }),
-    prisma.customerUserAccess.findFirst({ where: { customerUserId: user.id, customer: { companyId: user.companyId!, communityId: { not: null } } }, select: { id: true } }),
-    prisma.communityMembership.findFirst({ where: { customerUserId: user.id, isActive: true, community: { companyId: user.companyId! } }, select: { id: true } }),
+  const viewContextPromise = getCustomerViewContext({ userId: user.id, companyId: user.companyId!, companySlug: resolvedParams.companySlug })
+  const [company, viewContext, unreadRequestCount, unreadTicketCount, unreadAnnouncementCount] = await Promise.all([
+    getCustomerCompany(user.companyId!),
+    viewContextPromise,
+    prisma.ticket.count({
+      where: {
+        companyId: user.companyId!,
+        serviceRecipient: 'community_manager',
+        managerReads: { none: { customerUserId: user.id } },
+        customer: { community: { memberships: { some: { customerUserId: user.id, role: 'community_manager', isActive: true } } } },
+      },
+    }),
+    prisma.ticket.count({
+      where: {
+        companyId: user.companyId!,
+        customer: { userAccess: { some: { customerUserId: user.id } } },
+        messages: { some: { authorType: { in: ['employee', 'community_manager'] }, isInternal: false } },
+        customerReads: { none: { customerUserId: user.id } },
+      },
+    }),
+    viewContextPromise.then((resolvedViewContext) => getUnreadAnnouncementCount({
+      userId: user.id,
+      companyId: user.companyId!,
+      viewContext: resolvedViewContext,
+    })),
   ])
 
   return (
@@ -33,9 +57,13 @@ export default async function CustomerLayout({
         companyName={company?.name ?? 'Company'}
         primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
         userName={user.name}
-        hasCommunityAccess={Boolean(residentCommunity || membership)}
+        hasCommunityAccess={viewContext.hasResidentCommunity || viewContext.options.some((option) => option.mode !== 'resident')}
+        viewContext={viewContext}
+        unreadRequestCount={unreadRequestCount}
+        unreadTicketCount={unreadTicketCount}
+        unreadAnnouncementCount={unreadAnnouncementCount}
       />
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         {children}
       </main>
     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Ticket, Search, Filter } from 'lucide-react'
+import { Search } from 'lucide-react'
 import Link from 'next/link'
 
 const statusColors: Record<string, string> = {
@@ -22,13 +22,15 @@ const priorityColors: Record<string, string> = {
 export function TicketsClient({ tickets, companySlug }: { tickets: any[]; companySlug: string }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [routingFilter, setRoutingFilter] = useState('all')
 
   const filtered = (tickets ?? []).filter((t: any) => {
     const matchesSearch = (t?.subject ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (t?.ticketNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (t?.customer?.name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'all' || t?.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesRouting = routingFilter === 'all' || t?.serviceRecipient === routingFilter
+    return matchesSearch && matchesStatus && matchesRouting
   })
 
   return (
@@ -58,6 +60,11 @@ export function TicketsClient({ tickets, companySlug }: { tickets: any[]; compan
           <option value="resolved">Resolved</option>
           <option value="closed">Closed</option>
         </select>
+        <select value={routingFilter} onChange={(e: any) => setRoutingFilter(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+          <option value="all">All Routing</option>
+          <option value="company">KC Disposal Handling</option>
+          <option value="community_manager">Community Manager Handling</option>
+        </select>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -73,11 +80,12 @@ export function TicketsClient({ tickets, companySlug }: { tickets: any[]; compan
           </thead>
           <tbody className="divide-y divide-slate-50">
             {filtered.map((ticket: any) => (
-              <tr key={ticket?.id} className="hover:bg-slate-50 transition-colors">
+              <tr key={ticket?.id} className={`transition-colors hover:bg-slate-50 ${ticket?.serviceRecipient === 'community_manager' ? 'bg-amber-50/40' : ''}`}>
                 <td className="px-6 py-4">
                   <Link href={`/${companySlug}/tickets/${ticket?.id}`} className="group">
                     <p className="text-sm font-medium text-slate-900 group-hover:text-blue-600">{ticket?.subject ?? '-'}</p>
                     <p className="text-xs text-slate-400 font-mono">{ticket?.ticketNumber ?? ''}</p>
+                    {ticket?.serviceRecipient === 'community_manager' && <span className="mt-1.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Community Manager handling · No action required</span>}
                   </Link>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-600 hidden md:table-cell">{ticket?.customer?.name ?? '-'}</td>
@@ -91,7 +99,7 @@ export function TicketsClient({ tickets, companySlug }: { tickets: any[]; compan
                     {ticket?.priority ?? '-'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600 hidden md:table-cell">{ticket?.assignedTo?.name ?? 'Unassigned'}</td>
+                <td className="px-6 py-4 text-sm text-slate-600 hidden md:table-cell">{ticket?.serviceRecipient === 'community_manager' ? ticket?.customer?.community?.name ? `${ticket.customer.community.name} Manager` : 'Community Manager' : ticket?.assignedTo?.name ?? 'Unassigned'}</td>
               </tr>
             ))}
             {filtered.length === 0 && (

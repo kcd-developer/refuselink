@@ -1,8 +1,27 @@
 import { prisma } from '@/lib/db'
 import { CompanyNotFound } from './company-not-found'
 import type { CSSProperties } from 'react'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: Promise<{ companySlug: string }> }): Promise<Metadata> {
+  const { companySlug } = await params
+  return {
+    manifest: `/${companySlug}/manifest.webmanifest`,
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'default',
+      title: 'RefuseLink',
+    },
+    icons: {
+      apple: '/apple-touch-icon.png',
+    },
+    other: {
+      'mobile-web-app-capable': 'yes',
+    },
+  }
+}
 
 export default async function CompanyLayout({
   children,

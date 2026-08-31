@@ -59,6 +59,8 @@ model Company {
   addresses        Address[]
   customers        Customer[]
   announcements    Announcement[]
+  communityAnnouncements CommunityAnnouncement[]
+  customerAnnouncementReads CustomerAnnouncementRead[]
   documents        Document[]
   serviceSchedules ServiceSchedule[]
   tickets          Ticket[]
@@ -159,11 +161,13 @@ model Community {
   cityId      String
   city        City                  @relation(fields: [cityId], references: [id])
   name        String
+  serviceIssueRouting String               @default("company")
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
   addresses   Address[]
   customers   Customer[]
   memberships CommunityMembership[]
+  announcements CommunityAnnouncement[]
 }
 
 model Address {
@@ -255,6 +259,11 @@ model CustomerUser {
   updatedAt            DateTime              @updatedAt
   accounts             CustomerUserAccess[]
   communityMemberships CommunityMembership[]
+  managerTicketReads ManagerTicketRead[]
+  customerTicketReads CustomerTicketRead[]
+  communityAnnouncements CommunityAnnouncement[]
+  companyAnnouncementReads CustomerAnnouncementRead[]
+  communityAnnouncementReads CustomerCommunityAnnouncementRead[]
 }
 
 model CommunityMembership {
@@ -274,7 +283,7 @@ model CommunityMembership {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  @@unique([communityId, customerUserId])
+  @@unique([communityId, customerUserId, role])
   @@index([customerUserId])
 }
 
@@ -312,6 +321,7 @@ model Announcement {
   createdById        String
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+  customerReads      CustomerAnnouncementRead[]
 }
 
 enum AnnouncementPriority {
@@ -319,6 +329,56 @@ enum AnnouncementPriority {
   normal
   high
   urgent
+}
+
+model CommunityAnnouncement {
+  id            String               @id @default(cuid())
+  companyId     String
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  communityId   String
+  community     Community            @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  title         String
+  content       String
+  priority      AnnouncementPriority @default(normal)
+  startDate     DateTime             @default(now())
+  endDate       DateTime?
+  isPublished   Boolean              @default(true)
+  createdById   String
+  createdBy     CustomerUser         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdByRole CommunityRole
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  customerReads CustomerCommunityAnnouncementRead[]
+
+  @@index([companyId, isPublished])
+  @@index([communityId, isPublished])
+  @@index([createdById])
+}
+
+model CustomerAnnouncementRead {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  customerUserId String
+  customerUser   CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  viewedAt       DateTime     @default(now())
+
+  @@unique([announcementId, customerUserId])
+  @@index([customerUserId, companyId])
+}
+
+model CustomerCommunityAnnouncementRead {
+  id                      String                @id @default(cuid())
+  communityAnnouncementId String
+  communityAnnouncement   CommunityAnnouncement @relation(fields: [communityAnnouncementId], references: [id], onDelete: Cascade)
+  customerUserId          String
+  customerUser            CustomerUser          @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  viewedAt                 DateTime              @default(now())
+
+  @@unique([communityAnnouncementId, customerUserId])
+  @@index([customerUserId])
 }
 
 model Document {
@@ -385,6 +445,8 @@ model Ticket {
   category      TicketCategory  @default(other)
   status        TicketStatus    @default(open)
   priority      TicketPriority  @default(normal)
+  serviceRecipient String        @default("company")
+  escalatedAt    DateTime?
   assignedToId  String?
   assignedTo    CompanyUser?    @relation("AssignedTickets", fields: [assignedToId], references: [id])
   createdById   String
@@ -392,8 +454,35 @@ model Ticket {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   messages      TicketMessage[]
+  managerReads  ManagerTicketRead[]
+  customerReads CustomerTicketRead[]
 
   @@unique([companyId, ticketNumber])
+  @@index([companyId, serviceRecipient])
+}
+
+model ManagerTicketRead {
+  id             String       @id @default(cuid())
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  customerUserId String
+  customerUser   CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  viewedAt       DateTime     @default(now())
+
+  @@unique([ticketId, customerUserId])
+  @@index([customerUserId])
+}
+
+model CustomerTicketRead {
+  id             String       @id @default(cuid())
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  customerUserId String
+  customerUser   CustomerUser @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  viewedAt       DateTime     @default(now())
+
+  @@unique([ticketId, customerUserId])
+  @@index([customerUserId])
 }
 
 enum TicketCategory {

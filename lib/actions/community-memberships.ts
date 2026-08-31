@@ -51,7 +51,7 @@ export async function assignBoardMember(companySlug: string, input: unknown) {
   if (!resident) return { error: 'Board members must be residents of this community' }
 
   await prisma.communityMembership.upsert({
-    where: { communityId_customerUserId: { communityId: data.communityId, customerUserId: data.customerUserId } },
+    where: { communityId_customerUserId_role: { communityId: data.communityId, customerUserId: data.customerUserId, role: 'board_member' } },
     create: {
       communityId: data.communityId,
       customerUserId: data.customerUserId,
@@ -75,6 +75,7 @@ export async function assignBoardMember(companySlug: string, input: unknown) {
     },
   })
   revalidatePath(`/${companySlug}/communities`)
+  revalidatePath(`/${companySlug}/my`, 'layout')
   return { success: true }
 }
 
@@ -94,7 +95,7 @@ export async function assignCommunityManager(companySlug: string, input: unknown
   }
 
   await prisma.communityMembership.upsert({
-    where: { communityId_customerUserId: { communityId: data.communityId, customerUserId: manager.id } },
+    where: { communityId_customerUserId_role: { communityId: data.communityId, customerUserId: manager.id, role: 'community_manager' } },
     create: {
       communityId: data.communityId,
       customerUserId: manager.id,
@@ -118,16 +119,32 @@ export async function assignCommunityManager(companySlug: string, input: unknown
     },
   })
   revalidatePath(`/${companySlug}/communities`)
+  revalidatePath(`/${companySlug}/my`, 'layout')
   return { success: true }
 }
 
 export async function removeCommunityMembership(companySlug: string, membershipId: string) {
   const user = await authorize(companySlug)
   if (!user) return { error: 'Unauthorized' }
+  const membership = await prisma.communityMembership.findFirst({
+    where: { id: membershipId, community: { companyId: user.companyId! } },
+    select: { communityId: true, role: true },
+  })
+  if (!membership) return { error: 'Assignment not found' }
   const removed = await prisma.communityMembership.deleteMany({
     where: { id: membershipId, community: { companyId: user.companyId! } },
   })
   if (!removed.count) return { error: 'Assignment not found' }
+  if (membership.role === 'community_manager') {
+    const remainingManager = await prisma.communityMembership.findFirst({
+      where: { communityId: membership.communityId, role: 'community_manager', isActive: true },
+      select: { id: true },
+    })
+    if (!remainingManager) {
+      await prisma.community.update({ where: { id: membership.communityId }, data: { serviceIssueRouting: 'company' } })
+    }
+  }
   revalidatePath(`/${companySlug}/communities`)
+  revalidatePath(`/${companySlug}/my`, 'layout')
   return { success: true }
 }

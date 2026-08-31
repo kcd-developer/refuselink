@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Send, Lock, User } from 'lucide-react'
+import { ArrowLeft, Send, Lock, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -22,6 +22,18 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState(ticket?.status ?? 'open')
   const [assignedToId, setAssignedToId] = useState(ticket?.assignedToId ?? '')
+  const [managerHandling, setManagerHandling] = useState(ticket?.serviceRecipient === 'community_manager')
+  const [takingOver, setTakingOver] = useState(false)
+
+  const handleTakeOver = async () => {
+    if (!window.confirm('Move this request into KC Disposal’s active workload?')) return
+    setTakingOver(true)
+    const response = await fetch(`/api/company/${companySlug}/tickets/${ticket?.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ takeOwnership: true }),
+    })
+    if (response.ok) { setManagerHandling(false); router.refresh() }
+    setTakingOver(false)
+  }
 
   const handleSendMessage = async () => {
     if (!message.trim()) return
@@ -79,6 +91,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main content */}
         <div className="lg:col-span-2">
+          {managerHandling && <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 text-amber-700" /><div><p className="font-semibold text-amber-900">Community Manager handling</p><p className="mt-1 text-sm text-amber-800">This request is visible for awareness, but no KC Disposal action is required unless the manager escalates it.</p></div></div><button onClick={handleTakeOver} disabled={takingOver} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">{takingOver ? 'Taking over...' : 'KC Disposal take over'}</button></div>}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
             <div className="px-6 py-5 border-b border-slate-100">
               <div className="flex items-start justify-between">
@@ -119,7 +132,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
             </div>
 
             {/* Reply box */}
-            <div className="px-6 py-4 border-t border-slate-100">
+            {!managerHandling && <div className="px-6 py-4 border-t border-slate-100">
               <textarea
                 value={message}
                 onChange={(e: any) => setMessage(e.target.value)}
@@ -143,7 +156,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                   <Send className="h-4 w-4" /> {sending ? 'Sending...' : 'Send'}
                 </button>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -160,6 +173,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                 <dt className="text-xs text-slate-500">Status</dt>
                 <dd>
                   <select
+                    disabled={managerHandling}
                     value={status}
                     onChange={(e: any) => handleStatusChange(e.target.value)}
                     className="mt-1 w-full px-2 py-1.5 border border-slate-200 rounded-md text-sm bg-white"
@@ -176,6 +190,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                 <dt className="text-xs text-slate-500">Assigned To</dt>
                 <dd>
                   <select
+                    disabled={managerHandling}
                     value={assignedToId}
                     onChange={(e: any) => handleAssign(e.target.value)}
                     className="mt-1 w-full px-2 py-1.5 border border-slate-200 rounded-md text-sm bg-white"

@@ -4,6 +4,9 @@ import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { redirect, notFound } from 'next/navigation'
 import { CustomerTicketDetailClient } from './ticket-detail-client'
+import { MarkTicketsRead } from '../mark-tickets-read'
+import { getCustomerCompany } from '@/lib/customer-company'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export default async function CustomerTicketDetailPage({ params }: { params: Promise<{ companySlug: string; id: string }> }) {
   const resolvedParams = await params
@@ -18,7 +21,7 @@ export default async function CustomerTicketDetailPage({ params }: { params: Pro
   })
   const customerIds = access.map(a => a.customerId)
 
-  const ticket = await prisma.ticket.findUnique({
+  const [ticket, company] = await Promise.all([prisma.ticket.findUnique({
     where: { id: resolvedParams.id, companyId: user.companyId! },
     include: {
       customer: { select: { name: true } },
@@ -28,9 +31,9 @@ export default async function CustomerTicketDetailPage({ params }: { params: Pro
         include: { attachments: true },
       },
     },
-  })
+  }), getCustomerCompany(user.companyId!)])
 
   if (!ticket || !customerIds.includes(ticket.customerId)) return notFound()
 
-  return <CustomerTicketDetailClient ticket={ticket as any} companySlug={resolvedParams.companySlug} />
+  return <><AutoRefresh /><MarkTicketsRead companySlug={resolvedParams.companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={ticket as any} companySlug={resolvedParams.companySlug} companyName={company?.name ?? 'Service Company'} /></>
 }

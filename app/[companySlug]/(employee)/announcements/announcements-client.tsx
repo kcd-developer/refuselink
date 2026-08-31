@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Megaphone, Plus, X, Pencil, Trash2, AlertTriangle, Info, AlertCircle, Bell } from 'lucide-react'
 import { createAnnouncement, updateAnnouncement, deleteAnnouncement } from '@/lib/actions/announcements'
+import { moderateCommunityAnnouncement } from '@/lib/actions/community-announcements'
 
 const priorityConfig: Record<string, { color: string; bg: string; icon: any }> = {
   low: { color: 'text-slate-600', bg: 'bg-slate-50', icon: Info },
@@ -18,7 +19,7 @@ interface FormState {
 
 const emptyForm: FormState = { title: '', content: '', priority: 'normal', startDate: new Date().toISOString().split('T')[0], endDate: '', isPublished: false, targetAll: true, targetTypes: [], targetCityIds: [], targetCommunityIds: [] }
 
-export function AnnouncementsClient({ announcements, companySlug, cities, communities }: { announcements: any[]; companySlug: string; cities: any[]; communities: any[] }) {
+export function AnnouncementsClient({ announcements, communityAnnouncements, canModerateCommunity, companySlug, cities, communities }: { announcements: any[]; communityAnnouncements: any[]; canModerateCommunity: boolean; companySlug: string; cities: any[]; communities: any[] }) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -62,6 +63,12 @@ export function AnnouncementsClient({ announcements, companySlug, cities, commun
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this announcement?')) return
     const result = await deleteAnnouncement(companySlug, id)
+    if (result.error) alert(result.error)
+  }
+
+  const handleCommunityModeration = async (id: string, action: 'publish' | 'unpublish' | 'delete') => {
+    if (action === 'delete' && !confirm('Permanently delete this community announcement?')) return
+    const result = await moderateCommunityAnnouncement(companySlug, id, action)
     if (result.error) alert(result.error)
   }
 
@@ -209,6 +216,41 @@ export function AnnouncementsClient({ announcements, companySlug, cities, commun
           )
         })}
         {announcements.length === 0 && <p className="text-slate-400 text-sm py-12 text-center">No announcements yet</p>}
+      </div>
+
+      <div className="mt-10 border-t border-slate-200 pt-8">
+        <div className="mb-5">
+          <h2 className="font-display text-xl font-bold text-slate-900">Community Announcements</h2>
+          <p className="mt-1 text-sm text-slate-500">Review announcements published by board members and community managers.</p>
+        </div>
+        <div className="space-y-4">
+          {communityAnnouncements.map((announcement: any) => {
+            const pc = priorityConfig[announcement.priority] ?? priorityConfig.normal
+            const PIcon = pc.icon
+            return (
+              <div key={announcement.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-50"><PIcon className={`h-4 w-4 ${pc.color}`} /></div>
+                    <div className="min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2"><span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">{announcement.community.name}</span><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${announcement.isPublished ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{announcement.isPublished ? 'Published' : 'Unpublished'}</span></div>
+                      <h3 className="font-semibold text-slate-900">{announcement.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600 line-clamp-2">{announcement.content}</p>
+                      <p className="mt-2 text-xs text-slate-400">Posted by {announcement.createdBy.name} · {announcement.createdBy.email}</p>
+                    </div>
+                  </div>
+                  {canModerateCommunity && (
+                    <div className="flex shrink-0 gap-2">
+                      <button onClick={() => handleCommunityModeration(announcement.id, announcement.isPublished ? 'unpublish' : 'publish')} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">{announcement.isPublished ? 'Unpublish' : 'Publish'}</button>
+                      <button onClick={() => handleCommunityModeration(announcement.id, 'delete')} className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600" title="Delete community announcement"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {!communityAnnouncements.length && <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-400">No community announcements have been published.</div>}
+        </div>
       </div>
     </div>
   )

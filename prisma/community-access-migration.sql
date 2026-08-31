@@ -30,7 +30,7 @@ CREATE TABLE "CommunityMembership" (
   CONSTRAINT "CommunityMembership_customerUserId_fkey" FOREIGN KEY ("customerUserId") REFERENCES "CustomerUser"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE UNIQUE INDEX "CommunityMembership_communityId_customerUserId_key" ON "CommunityMembership"("communityId", "customerUserId");
+CREATE UNIQUE INDEX "CommunityMembership_communityId_customerUserId_role_key" ON "CommunityMembership"("communityId", "customerUserId", "role");
 CREATE INDEX "CommunityMembership_customerUserId_idx" ON "CommunityMembership"("customerUserId");
 
 ALTER TABLE "Ticket" ADD COLUMN "category" "TicketCategory" NOT NULL DEFAULT 'other';
