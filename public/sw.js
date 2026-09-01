@@ -1,5 +1,5 @@
-const CACHE_NAME = 'refuselink-install-v1'
-const INSTALL_ASSETS = ['/favicon.svg', '/pwa-icon.svg', '/pwa-icon-192.png', '/pwa-icon-512.png', '/apple-touch-icon.png']
+const CACHE_NAME = 'refuselink-install-v2'
+const INSTALL_ASSETS = ['/favicon-32.png', '/favicon-64.png', '/pwa-icon-192.png', '/pwa-icon-512.png', '/apple-touch-icon.png', '/refuselink-logo.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(INSTALL_ASSETS)))

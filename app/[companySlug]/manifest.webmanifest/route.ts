@@ -22,9 +22,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ com
     background_color: '#f8fafc',
     theme_color: company.branding?.primaryColor ?? '#1d4ed8',
     icons: [
-      { src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/pwa-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/pwa-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: '/pwa-icon-192.png?v=3', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/pwa-icon-512.png?v=3', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/pwa-icon-512.png?v=3', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   }, {
     headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' },

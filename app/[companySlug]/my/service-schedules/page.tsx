@@ -32,11 +32,11 @@ export default async function CustomerSchedulesPage({ params }: { params: Promis
       <div className="space-y-4">
         {assignments.flatMap((assignment) => assignment.services.map((service) => {
           const serviceImage = service.service === 'trash'
-            ? '/images/kc-disposal-trash-cart-clean.png'
+            ? '/images/kc-disposal-trash-cart-black-lid.png'
             : service.service === 'recycling'
-              ? '/images/kc-disposal-recycling-cart-clean.png'
+              ? '/images/kc-disposal-recycling-cart-green-lid.png'
               : service.service === 'yard_waste'
-                ? service.containerSize ? '/images/kc-disposal-yard-waste-cart.png' : '/images/yard-waste-bag.png'
+                ? service.containerSize ? '/images/kc-disposal-yard-waste-cart-brown-lid.png' : '/images/yard-waste-bag.png'
                 : null
 
           return (

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
@@ -120,9 +121,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-5">
           <Link href={`/${companySlug}/my`} className="flex min-w-0 max-w-[calc(100%-3.5rem)] items-center gap-2 min-[1280px]:w-48 min-[1280px]:shrink-0">
-            <div className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center" style={{ backgroundColor: color, boxShadow: 'inset 0 -3px 0 var(--company-secondary)' }}>
-              <span className="text-white font-bold text-sm">{companyName?.charAt?.(0) ?? 'C'}</span>
-            </div>
+            <Image src="/refuselink-logo.png" alt="" width={32} height={32} className="h-8 w-8 shrink-0" priority />
             <span className="truncate font-display font-semibold leading-tight text-slate-900">{companyName ?? 'Company'}</span>
           </Link>
 

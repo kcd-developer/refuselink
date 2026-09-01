@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import {
@@ -48,9 +49,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
       <div className="flex items-center justify-between px-4 py-5 border-b border-slate-200">
         {!collapsed && (
           <Link href={`/${companySlug}/dashboard`} className="flex items-center gap-2 min-w-0">
-            <div className="h-8 w-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: primaryColor ?? '#1D4ED8', boxShadow: 'inset 0 -3px 0 var(--company-secondary)' }}>
-              <span className="text-white font-bold text-sm">{companyName?.charAt?.(0) ?? 'C'}</span>
-            </div>
+            <Image src="/refuselink-logo.png" alt="" width={32} height={32} className="h-8 w-8 flex-shrink-0" priority />
             <span className="font-display font-semibold text-slate-900 truncate">{companyName ?? 'Company'}</span>
           </Link>
         )}

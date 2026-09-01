@@ -7,15 +7,16 @@ export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ companySlug: string }> }): Promise<Metadata> {
   const { companySlug } = await params
+  const company = await prisma.company.findUnique({ where: { slug: companySlug }, select: { name: true } })
   return {
     manifest: `/${companySlug}/manifest.webmanifest`,
     appleWebApp: {
       capable: true,
       statusBarStyle: 'default',
-      title: 'RefuseLink',
+      title: company?.name ?? 'RefuseLink',
     },
     icons: {
-      apple: '/apple-touch-icon.png',
+      apple: '/apple-touch-icon.png?v=3',
     },
     other: {
       'mobile-web-app-capable': 'yes',

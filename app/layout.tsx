@@ -7,8 +7,15 @@ import { Providers } from './providers'
 import { Suspense } from 'react'
 import { NavigationLoadingOverlay } from '@/components/navigation-loading-overlay'
 import { PwaRegistration } from '@/components/pwa-registration'
+import type { Viewport } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' })
 const jakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-display' })
@@ -19,8 +26,11 @@ export const metadata = {
   title: 'RefuseLink — Waste Management Made Simple',
   description: 'Modern SaaS platform for waste management companies. Manage customers, schedules, tickets, and more.',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
+    icon: [
+      { url: '/favicon-32.png?v=3', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-64.png?v=3', sizes: '64x64', type: 'image/png' },
+    ],
+    shortcut: '/favicon-32.png?v=3',
   },
   openGraph: {
     title: 'RefuseLink — Waste Management Made Simple',

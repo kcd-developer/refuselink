@@ -51,7 +51,7 @@ export default async function CustomerLayout({
   ])
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50">
       <CustomerNav
         companySlug={resolvedParams.companySlug}
         companyName={company?.name ?? 'Company'}
@@ -63,7 +63,7 @@ export default async function CustomerLayout({
         unreadTicketCount={unreadTicketCount}
         unreadAnnouncementCount={unreadAnnouncementCount}
       />
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:py-8">
         {children}
       </main>
     </div>
