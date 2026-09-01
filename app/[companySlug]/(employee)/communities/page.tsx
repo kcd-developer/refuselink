@@ -18,7 +18,7 @@ export default async function CommunitiesPage({ params }: { params: Promise<{ co
         city: { select: { name: true, state: true } },
         addresses: {
           where: { latitude: { not: null }, longitude: { not: null } },
-          select: { id: true, address: true, address2: true, latitude: true, longitude: true, services: { select: { service: true, route: true, containerSize: true, dayOfWeek: true } } },
+          select: { id: true, address: true, address2: true, latitude: true, longitude: true, services: { select: { service: true, route: true, containerSize: true, dayOfWeek: true, weekCycle: true } } },
         },
         memberships: {
           where: { isActive: true },
@@ -43,7 +43,7 @@ export default async function CommunitiesPage({ params }: { params: Promise<{ co
     }),
     prisma.addressService.findMany({
       where: { address: { companyId: user.companyId!, communityId: { not: null } } },
-      select: { addressId: true, service: true, route: true, containerSize: true, dayOfWeek: true, address: { select: { communityId: true } } },
+      select: { addressId: true, service: true, route: true, containerSize: true, dayOfWeek: true, weekCycle: true, address: { select: { communityId: true } } },
     }),
   ])
 
@@ -58,6 +58,7 @@ export default async function CommunitiesPage({ params }: { params: Promise<{ co
         routes: [...new Set(assignments.map((assignment) => assignment.route || 'Unassigned'))].sort(),
         containerSizes: [...new Set(assignments.map((assignment) => assignment.containerSize || 'No Container'))].sort(),
         daysOfWeek: [...new Set(assignments.map((assignment) => assignment.dayOfWeek))].sort(),
+        weekCycles: [...new Set(assignments.map((assignment) => assignment.weekCycle || 'every'))].sort(),
       }]
     })
     return { ...community, serviceSummaries }

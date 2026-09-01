@@ -8,7 +8,7 @@ import { assignBoardMember, assignCommunityManager, removeCommunityMembership } 
 import { colorForRoute, CommunityMap, type CommunityMapPoint } from '@/components/community-map'
 
 interface CommunityMembership { id: string; role: 'board_member' | 'community_manager'; positionTitle: string | null; publicEmail: string | null; publicPhone: string | null; showEmail: boolean; showPhone: boolean; customerUser: { id: string; name: string; email: string; phone: string | null } }
-interface ServiceSummary { service: 'trash' | 'recycling' | 'yard_waste'; assignedCount: number; routes: string[]; containerSizes: string[]; daysOfWeek: number[] }
+interface ServiceSummary { service: 'trash' | 'recycling' | 'yard_waste'; assignedCount: number; routes: string[]; containerSizes: string[]; daysOfWeek: number[]; weekCycles: string[] }
 interface Community { id: string; name: string; cityId: string; city: { name: string; state: string }; addresses: CommunityMapPoint[]; memberships: CommunityMembership[]; serviceSummaries: ServiceSummary[]; _count: { customers: number; addresses: number } }
 interface City { id: string; name: string; state: string }
 interface ResidentAccess { customerUser: { id: string; name: string; email: string; phone: string | null }; customer: { communityId: string | null } }
@@ -30,7 +30,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
   const [residentUserId, setResidentUserId] = useState('')
   const [positionTitle, setPositionTitle] = useState('Board Member')
   const [manager, setManager] = useState({ name: '', email: '', phone: '', password: '', positionTitle: 'Community Manager' })
-  const [bulkRoute, setBulkRoute] = useState({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1 })
+  const [bulkRoute, setBulkRoute] = useState<{ service: string; route: string; containerSize: string; dayOfWeek: number; weekCycle: 'a' | 'b' | null }>({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1, weekCycle: null })
   const [bulkRouteError, setBulkRouteError] = useState('')
   const [bulkRouteResult, setBulkRouteResult] = useState('')
   const [bulkRouteLoading, setBulkRouteLoading] = useState(false)
@@ -39,7 +39,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
   const resetForm = () => { setShowForm(false); setEditing(null); setName(''); setCityId(''); setError('') }
   const resetServiceEditor = () => {
     setEditingService(null)
-    setBulkRoute({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1 })
+    setBulkRoute({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1, weekCycle: null })
     setBulkRouteError('')
     setBulkRouteResult('')
   }
@@ -135,23 +135,25 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
           routes: [savedRoute],
           containerSizes: [bulkRoute.containerSize || 'No Container'],
           daysOfWeek: [bulkRoute.dayOfWeek],
+          weekCycles: [bulkRoute.weekCycle || 'every'],
         },
       ],
       addresses: current.addresses.map((address) => ({
         ...address,
         services: [
           ...address.services.filter((service) => service.service !== bulkRoute.service),
-          { service: bulkRoute.service, route: savedRoute, containerSize: bulkRoute.containerSize || null, dayOfWeek: bulkRoute.dayOfWeek },
+          { service: bulkRoute.service, route: savedRoute, containerSize: bulkRoute.containerSize || null, dayOfWeek: bulkRoute.dayOfWeek, weekCycle: bulkRoute.weekCycle },
         ],
       })),
     } : current)
-    setBulkRoute({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1 })
+    setBulkRoute({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1, weekCycle: null })
     setEditingService(null)
     router.refresh()
   }
 
   const startEditCommunityService = (summary: ServiceSummary) => {
-    setBulkRoute({ service: summary.service, route: summary.routes[0] === 'Unassigned' ? '' : summary.routes[0], containerSize: summary.containerSizes[0] === 'No Container' ? '' : summary.containerSizes[0], dayOfWeek: summary.daysOfWeek[0] ?? 1 })
+    const weekCycle = summary.weekCycles[0] === 'a' || summary.weekCycles[0] === 'b' ? summary.weekCycles[0] : null
+    setBulkRoute({ service: summary.service, route: summary.routes[0] === 'Unassigned' ? '' : summary.routes[0], containerSize: summary.containerSizes[0] === 'No Container' ? '' : summary.containerSizes[0], dayOfWeek: summary.daysOfWeek[0] ?? 1, weekCycle })
     setEditingService(summary.service)
     setBulkRouteError(''); setBulkRouteResult('')
   }
@@ -257,6 +259,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
                     <div className="flex justify-between gap-3"><dt className="text-slate-400">Route</dt><dd className="text-right font-medium text-slate-700">{summary.routes.join(', ')}</dd></div>
                     <div className="flex justify-between gap-3"><dt className="text-slate-400">Container</dt><dd className="text-right font-medium text-slate-700">{summary.containerSizes.join(', ')}</dd></div>
                     <div className="flex justify-between gap-3"><dt className="text-slate-400">Day</dt><dd className="text-right font-medium text-slate-700">{summary.daysOfWeek.map((day) => dayNames[day]).join(', ')}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-slate-400">Frequency</dt><dd className="text-right font-medium text-slate-700">{summary.weekCycles.map((cycle) => cycle === 'a' ? 'A Week' : cycle === 'b' ? 'B Week' : 'Every Week').join(', ')}</dd></div>
                   </dl>
                 </div>
               ))}
@@ -271,7 +274,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
             </div>
             {bulkRouteError && <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{bulkRouteError}</div>}
             {bulkRouteResult && <div className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">{bulkRouteResult}</div>}
-            <div className="mt-4 grid gap-3 sm:grid-cols-[160px_1fr_150px_160px_auto]">
+            <div className="mt-4 grid gap-3 sm:grid-cols-[140px_1fr_130px_140px_130px_auto]">
               <select value={bulkRoute.service} disabled={Boolean(editingService)} onChange={(event) => setBulkRoute((current) => ({ ...current, service: event.target.value }))} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500">
                 <option value="trash">Trash</option><option value="recycling">Recycling</option><option value="yard_waste">Yard Waste</option>
               </select>
@@ -281,6 +284,9 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
               </select>
               <select value={bulkRoute.dayOfWeek} onChange={(event) => setBulkRoute((current) => ({ ...current, dayOfWeek: Number(event.target.value) }))} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
                 {dayNames.map((day, index) => <option key={day} value={index}>{day}</option>)}
+              </select>
+              <select value={bulkRoute.weekCycle ?? ''} onChange={(event) => setBulkRoute((current) => ({ ...current, weekCycle: event.target.value === 'a' || event.target.value === 'b' ? event.target.value : null }))} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value="">Every Week</option><option value="a">A Week</option><option value="b">B Week</option>
               </select>
               <div className="flex gap-2">
                 {editingService && <button type="button" onClick={resetServiceEditor} disabled={bulkRouteLoading} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>}

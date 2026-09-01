@@ -8,7 +8,7 @@ import {
   Ticket, LogOut, Menu, X, ChevronDown, Check, Settings
 } from 'lucide-react'
 import { Building2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { CustomerViewContext, CustomerViewOption } from '@/lib/customer-view'
 import {
@@ -39,6 +39,8 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
   const [unreadRequests, setUnreadRequests] = useState(unreadRequestCount)
   const [unreadTickets, setUnreadTickets] = useState(unreadTicketCount)
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(unreadAnnouncementCount)
+  const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
+  const userMenuOpenedByPointer = useRef(false)
   const isSwitching = Boolean(switchingTo)
   const color = primaryColor ?? '#1D4ED8'
 
@@ -78,7 +80,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
     { href: `/${companySlug}/my/documents`, label: 'Documents', icon: FileText },
     { href: `/${companySlug}/my/service-schedules`, label: 'Schedule', icon: Calendar },
     ...(hasCommunityAccess ? [{ href: `/${companySlug}/my/community`, label: 'Community', icon: Building2 }] : []),
-    { href: `/${companySlug}/my/tickets`, label: 'Tickets', icon: Ticket, badge: unreadTickets },
+    { href: `/${companySlug}/my/tickets`, label: 'Requests', icon: Ticket, badge: unreadTickets },
   ]
   const elevatedNavItems = [
     { href: `/${companySlug}/my/community`, label: viewContext.active.allCommunities ? 'Communities' : 'Community', icon: Building2, exact: true },
@@ -161,12 +163,21 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
             <div className="hidden min-[1280px]:block">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex max-w-48 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-900 outline-none transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500">
+                  <button ref={userMenuTriggerRef} onPointerDown={() => { userMenuOpenedByPointer.current = true }} className="flex max-w-48 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-900 outline-none transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500">
                     <span className="truncate">{userName ?? 'Customer'}</span>
                     <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 rounded-xl border-slate-200 bg-white p-1.5 shadow-lg">
+                <DropdownMenuContent
+                  align="end"
+                  onCloseAutoFocus={(event) => {
+                    if (!userMenuOpenedByPointer.current) return
+                    event.preventDefault()
+                    userMenuTriggerRef.current?.blur()
+                    userMenuOpenedByPointer.current = false
+                  }}
+                  className="w-80 rounded-xl border-slate-200 bg-white p-1.5 shadow-lg"
+                >
                   <DropdownMenuLabel className="px-2.5 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">
                     Viewing As
                   </DropdownMenuLabel>

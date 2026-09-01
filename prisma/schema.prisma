@@ -202,6 +202,7 @@ model AddressService {
   route         String?
   containerSize String?
   dayOfWeek     Int
+  weekCycle     ServiceWeekCycle?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -213,6 +214,11 @@ enum ServiceType {
   trash
   recycling
   yard_waste
+}
+
+enum ServiceWeekCycle {
+  a
+  b
 }
 
 model Customer {

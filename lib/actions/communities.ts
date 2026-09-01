@@ -16,6 +16,7 @@ const routeAssignmentSchema = z.object({
   route: z.string().trim().min(1, 'Route is required').max(100),
   containerSize: z.string().trim().max(30).optional().nullable(),
   dayOfWeek: z.number().int().min(0).max(6),
+  weekCycle: z.enum(['a', 'b']).optional().nullable(),
 })
 
 function normalizeContainerSize(value?: string | null) {
@@ -97,10 +98,10 @@ export async function applyCommunityRouteAssignment(companySlug: string, communi
   await prisma.$transaction(async (tx) => {
     await tx.addressService.updateMany({
       where: { addressId: { in: addressIds }, service: parsed.data.service },
-      data: { route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek },
+      data: { route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null },
     })
     await tx.addressService.createMany({
-      data: addressIds.map((addressId) => ({ addressId, service: assignment.service, route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek })),
+      data: addressIds.map((addressId) => ({ addressId, service: assignment.service, route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null })),
       skipDuplicates: true,
     })
   }, { timeout: 30000 })

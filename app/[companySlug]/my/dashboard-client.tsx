@@ -2,12 +2,14 @@
 
 import {
   ArrowRight, Calendar, CreditCard, ExternalLink, FileText, Leaf,
-  Megaphone, Recycle, Send, Ticket, Trash2, User,
+  Megaphone, Send, Ticket, User,
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { daysUntilService, serviceWeekLabel, type ServiceWeekCycle } from '@/lib/service-week-cycle'
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 interface Props {
   userName: string
@@ -22,7 +24,7 @@ interface Props {
 }
 
 const serviceLabels: Record<string, string> = {
-  trash: 'Trash', recycling: 'Recycling', recycle: 'Recycling', yard_waste: 'Yard Waste',
+  trash: 'Trash', recycling: 'Recycle', recycle: 'Recycle', yard_waste: 'Yard Waste',
 }
 
 const serviceStyles: Record<string, { background: string; color: string }> = {
@@ -32,32 +34,47 @@ const serviceStyles: Record<string, { background: string; color: string }> = {
   yard_waste: { background: '#8A5A36', color: '#fff' },
 }
 
-function ServiceIcon({ service, className = 'h-4 w-4' }: { service: string; className?: string }) {
-  if (service === 'recycling' || service === 'recycle') return <Recycle className={className} />
-  if (service === 'yard_waste') return <Leaf className={className} />
-  return <Trash2 className={className} />
-}
-
 export function CustomerDashboardClient({
   userName, companySlug, primaryColor, paymentUrl, paymentLabel,
   accounts, openTickets, announcements, addressServices,
 }: Props) {
-  const currentDay = new Date().getDay()
+  const currentDate = new Date()
   const allServices = (addressServices ?? []).flatMap((item: any) => item.services ?? [])
-  const nextService = [...allServices].sort((left: any, right: any) =>
-    ((left.dayOfWeek - currentDay + 7) % 7) - ((right.dayOfWeek - currentDay + 7) % 7)
-  )[0]
-  const nextServiceLabel = nextService
-    ? `${dayNames[nextService.dayOfWeek]} · ${serviceLabels[nextService.service] ?? nextService.service}`
-    : 'No service scheduled'
   const firstName = userName?.split?.(' ')?.[0] ?? 'Customer'
   const primaryAccount = (accounts ?? []).find((account: any) => account?.isPrimary)?.customer ?? (accounts ?? [])[0]?.customer
   const primaryServices = (addressServices ?? []).find((item: any) => item.customerId === primaryAccount?.id)?.services ?? []
-  const heroCart = nextService?.service === 'trash'
-    ? '/images/kc-disposal-trash-cart.png'
-    : nextService?.service === 'recycling' || nextService?.service === 'recycle'
-      ? '/images/kc-disposal-recycling-cart.png'
-      : null
+  const dashboardServices = primaryServices.length ? primaryServices : allServices
+  const scheduledServices = dashboardServices.filter((service: any) =>
+    service.service === 'trash' || service.service === 'recycling' || service.service === 'recycle' || service.service === 'yard_waste'
+  )
+  const upcomingServices = scheduledServices
+    .map((service: any) => ({
+      ...service,
+      daysUntil: daysUntilService(currentDate, service.dayOfWeek, (service.weekCycle ?? null) as ServiceWeekCycle),
+    }))
+    .filter((service: any) => service.daysUntil !== null)
+    .sort((left: any, right: any) => left.daysUntil - right.daysUntil)
+  const nextService = upcomingServices[0]
+  const nextServices = nextService
+    ? upcomingServices.filter((service: any) => service.daysUntil === nextService.daysUntil)
+    : []
+  const nextServiceOffset = nextService?.daysUntil ?? null
+  const nextServiceDay = nextServiceOffset === 0
+    ? 'Today'
+    : nextServiceOffset === 1
+      ? 'Tomorrow'
+      : nextService
+        ? fullDayNames[nextService.dayOfWeek]
+        : ''
+  const nextServiceLabel = nextService
+    ? nextServiceDay
+    : 'No service scheduled'
+  const hasTrashService = nextServices.some((service: any) => service.service === 'trash')
+  const hasRecyclingService = nextServices.some((service: any) => service.service === 'recycling' || service.service === 'recycle')
+  const yardWasteService = nextServices.find((service: any) => service.service === 'yard_waste')
+  const hasYardWasteService = Boolean(yardWasteService)
+  const hasTrashAndRecycling = hasTrashService && hasRecyclingService
+  const hasOtherCartService = hasTrashService || hasRecyclingService
 
   const stats = [
     { label: 'Open Tickets', value: openTickets ?? 0, icon: Ticket, accent: primaryColor },
@@ -77,11 +94,7 @@ export function CustomerDashboardClient({
 
         <div className="relative z-10 max-w-[62%]">
           <h1 className="font-display text-[clamp(1.875rem,3.2vw,2.25rem)] font-bold tracking-tight">Welcome, {firstName}</h1>
-          <p className="mt-1 text-[clamp(0.875rem,1.4vw,1rem)] text-blue-50">Manage your account and services</p>
-          <div className="mt-[clamp(2.25rem,4vw,2.75rem)] flex items-center gap-[clamp(0.75rem,1.5vw,1rem)]">
-            <span className="flex h-[clamp(3rem,5vw,3.5rem)] w-[clamp(3rem,5vw,3.5rem)] shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 shadow-inner backdrop-blur-sm">
-              {nextService ? <ServiceIcon service={nextService.service} className="h-6 w-6" /> : <Calendar className="h-6 w-6" />}
-            </span>
+          <div className="mt-[clamp(3.5rem,5vw,4.25rem)]">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-100">Next Service</p>
               <p className="mt-1 font-display text-[clamp(1.875rem,4vw,3rem)] font-bold leading-none">{nextServiceLabel}</p>
@@ -89,15 +102,39 @@ export function CustomerDashboardClient({
           </div>
         </div>
 
-        {heroCart ? (
-          <Image
-            src={heroCart}
-            alt={nextService?.service === 'trash' ? 'KC Disposal trash cart' : 'KC Disposal recycling cart'}
-            width={520}
-            height={500}
-            priority
-            className="absolute bottom-[clamp(-3.5rem,-4vw,-2.25rem)] right-[clamp(-3.5rem,-4vw,0.5rem)] z-0 h-[clamp(15.3125rem,40vw,21.5625rem)] w-[clamp(16.125rem,42vw,22.8125rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)]"
-          />
+        {hasTrashService || hasRecyclingService || hasYardWasteService ? (
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-[52%]" aria-hidden="true">
+            {hasYardWasteService && (
+              <Image
+                src={yardWasteService?.containerSize ? '/images/kc-disposal-yard-waste-cart.png' : '/images/yard-waste-bag.png'}
+                alt=""
+                width={yardWasteService?.containerSize ? 520 : 360}
+                height={yardWasteService?.containerSize ? 500 : 540}
+                priority
+                className={`absolute object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.25)] ${yardWasteService?.containerSize ? 'bottom-[clamp(-3.25rem,-4vw,-2.1rem)] h-[clamp(12rem,29vw,18rem)] w-[clamp(12.75rem,31vw,19.25rem)]' : 'bottom-[clamp(-0.75rem,-1vw,0.25rem)] h-[clamp(8rem,20vw,12rem)] w-[clamp(6.5rem,16vw,9.5rem)]'} ${hasOtherCartService ? 'right-[clamp(12rem,23vw,20rem)] z-0' : 'right-[clamp(0rem,2vw,3rem)] z-10'}`}
+              />
+            )}
+            {hasRecyclingService && (
+              <Image
+                src="/images/kc-disposal-recycling-cart-clean.png"
+                alt=""
+                width={520}
+                height={500}
+                priority
+                className={`absolute bottom-[clamp(-3.25rem,-4vw,-2.1rem)] h-[clamp(13rem,32vw,20rem)] w-[clamp(13.75rem,34vw,21.25rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)] ${hasTrashAndRecycling ? 'right-[clamp(3.5rem,8vw,7rem)] z-10 scale-[0.94]' : 'right-[clamp(-3.25rem,-4vw,0.5rem)] z-10'}`}
+              />
+            )}
+            {hasTrashService && (
+              <Image
+                src="/images/kc-disposal-trash-cart-clean.png"
+                alt=""
+                width={520}
+                height={500}
+                priority
+                className="absolute bottom-[clamp(-3.25rem,-4vw,-2.1rem)] right-[clamp(-3.25rem,-4vw,0.5rem)] z-10 h-[clamp(13rem,32vw,20rem)] w-[clamp(13.75rem,34vw,21.25rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)]"
+              />
+            )}
+          </div>
         ) : (
           <Leaf className="absolute -bottom-8 right-[clamp(1.25rem,5vw,3.5rem)] h-[clamp(13rem,24vw,16rem)] w-[clamp(13rem,24vw,16rem)] rotate-[-10deg] text-white/14" strokeWidth={1.2} />
         )}
@@ -133,9 +170,8 @@ export function CustomerDashboardClient({
                 <dt className="pt-1 text-slate-500">Services</dt>
                 <dd className="flex max-w-[75%] flex-wrap justify-end gap-1.5 text-right">
                   {primaryServices.length ? primaryServices.map((service: any) => (
-                    <span key={service.service} className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium shadow-sm" style={serviceStyles[service.service] ?? serviceStyles.trash}>
-                      <ServiceIcon service={service.service} className="h-3.5 w-3.5" />
-                      {serviceLabels[service.service] ?? service.service} · {dayNames[service.dayOfWeek]}{service.containerSize ? ` · ${service.containerSize}` : ''}
+                    <span key={service.service} className="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium shadow-sm" style={serviceStyles[service.service] ?? serviceStyles.trash}>
+                      {serviceLabels[service.service] ?? service.service} · {dayNames[service.dayOfWeek]}{service.weekCycle ? ` · ${serviceWeekLabel(service.weekCycle)}` : ''}{service.containerSize ? ` · ${service.containerSize}` : ''}
                     </span>
                   )) : <span className="pt-1 text-slate-500">Not assigned</span>}
                 </dd>
@@ -173,15 +209,12 @@ export function CustomerDashboardClient({
             ) : (
               (announcements ?? []).map((announcement: any) => (
                 <div key={announcement?.id} className="px-6 py-4 sm:px-7">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100" style={{ color: primaryColor }}><Megaphone className="h-3.5 w-3.5" /></span>
-                    <div>
+                  <div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-slate-900">{announcement?.title ?? '-'}</p>
                         {(announcement?.priority === 'high' || announcement?.priority === 'urgent') && <span className="h-2 w-2 rounded-full bg-red-500" />}
                       </div>
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{announcement?.content ?? ''}</p>
-                    </div>
                   </div>
                 </div>
               ))

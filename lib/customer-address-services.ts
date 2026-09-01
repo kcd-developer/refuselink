@@ -19,7 +19,7 @@ export async function getCustomerAddressServices(companyId: string, customers: C
       address: true,
       address2: true,
       cityId: true,
-      services: { select: { service: true, containerSize: true, dayOfWeek: true }, orderBy: { service: 'asc' } },
+      services: { select: { service: true, containerSize: true, dayOfWeek: true, weekCycle: true }, orderBy: { service: 'asc' } },
     },
   })
 

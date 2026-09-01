@@ -43,7 +43,10 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
     include: {
       city: { select: { name: true, state: true } },
       memberships: {
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          ...(viewContext.active.mode === 'resident' ? { role: 'board_member' as const } : {}),
+        },
         include: { customerUser: { select: { name: true } } },
         orderBy: { positionTitle: 'asc' },
       },
@@ -82,18 +85,20 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
             </span>
           )}
         </div>
-        <p className="mt-1 text-sm text-slate-500">
-          {viewContext.active.mode === 'resident'
-            ? 'Board contacts and community information'
-            : 'Community issue activity without resident names or private conversations'}
-        </p>
+        {viewContext.active.mode === 'board' && (
+          <p className="mt-1 text-sm text-slate-500">
+            Community issue activity without resident names or private conversations
+          </p>
+        )}
       </div>
       <div className="space-y-6">
         {communities.map((community) => {
           const communityIssues = issues.filter((issue) => issue.customer.communityId === community.id)
           const communityContent = (
             <div className="p-6">
-                <h3 className="mb-3 text-sm font-semibold text-slate-700">Board Members & Management</h3>
+                <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                  {viewContext.active.mode === 'resident' ? 'Board Members' : 'Board Members & Management'}
+                </h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {community.memberships.map((membership) => (
                     <div key={membership.id} className="rounded-lg bg-slate-50 p-4">
@@ -113,7 +118,7 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
                     <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
                       <div>
                         <h3 className="mb-1 text-sm font-semibold text-slate-700">Recent Community Activity</h3>
-                        <p className="text-xs text-slate-500">The three most recent entries are shown without private resident details or conversations.</p>
+                        {viewContext.active.mode !== 'manager' && <p className="text-xs text-slate-500">The three most recent entries are shown without private resident details or conversations.</p>}
                       </div>
                       <Link href={`/${companySlug}/my/community/${community.id}/activity`} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline">
                         View all activity <ArrowRight className="h-4 w-4" />

@@ -32,7 +32,7 @@ interface AddressRecord {
   longitude: number | null
   city: City
   community: { id: string; name: string } | null
-  services: Array<{ id: string; service: 'trash' | 'recycling' | 'yard_waste'; route: string | null; containerSize: string | null; dayOfWeek: number }>
+  services: Array<{ id: string; service: 'trash' | 'recycling' | 'yard_waste'; route: string | null; containerSize: string | null; dayOfWeek: number; weekCycle: 'a' | 'b' | null }>
 }
 
 type SortKey = 'address' | 'city' | 'zip' | 'community' | 'services'
@@ -94,6 +94,7 @@ const headerAliases: Record<string, ImportField> = {
   trash: 'trash',
   trashroute: 'trashRoute',
   trashday: 'trashDay',
+  trashweek: 'trashWeek',
   trashcontainersize: 'trashContainerSize',
   trashsize: 'trashContainerSize',
   recycle: 'recycle',
@@ -102,12 +103,15 @@ const headerAliases: Record<string, ImportField> = {
   recyclingroute: 'recycleRoute',
   recycleday: 'recycleDay',
   recyclingday: 'recycleDay',
+  recycleweek: 'recycleWeek',
+  recyclingweek: 'recycleWeek',
   recyclecontainersize: 'recycleContainerSize',
   recyclingcontainersize: 'recycleContainerSize',
   recyclesize: 'recycleContainerSize',
   yardwaste: 'yardWaste',
   yardwasteroute: 'yardWasteRoute',
   yardwasteday: 'yardWasteDay',
+  yardwasteweek: 'yardWasteWeek',
   yardwastecontainersize: 'yardWasteContainerSize',
   yardwastesize: 'yardWasteContainerSize',
   servaddr: 'softPakAddressNumber',
@@ -250,7 +254,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
       latitudeDirection: record.latitude == null || record.latitude >= 0 ? 'N' : 'S',
       longitudeDirection: record.longitude == null || record.longitude < 0 ? 'W' : 'E',
       communityId: record.community?.id ?? '',
-      services: record.services.map(({ service, route, containerSize, dayOfWeek }) => ({ service, route: route ?? '', containerSize: containerSize ?? '', dayOfWeek })),
+      services: record.services.map(({ service, route, containerSize, dayOfWeek, weekCycle }) => ({ service, route: route ?? '', containerSize: containerSize ?? '', dayOfWeek, weekCycle })),
     })
     setError('')
     setShowForm(true)
@@ -265,15 +269,17 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
     }))
   }
 
-  const updateService = (service: 'trash' | 'recycling' | 'yard_waste', enabled: boolean, field?: 'route' | 'containerSize' | 'dayOfWeek', value?: string) => {
+  const updateService = (service: 'trash' | 'recycling' | 'yard_waste', enabled: boolean, field?: 'route' | 'containerSize' | 'dayOfWeek' | 'weekCycle', value?: string) => {
     setForm((current) => {
       const existing = current.services.find((assignment) => assignment.service === service)
       if (!enabled) return { ...current, services: current.services.filter((assignment) => assignment.service !== service) }
-      const assignment = existing ?? { service, route: '', containerSize: '', dayOfWeek: 1 }
+      const assignment = existing ?? { service, route: '', containerSize: '', dayOfWeek: 1, weekCycle: null }
+      const weekCycle: 'a' | 'b' | null = value === 'a' || value === 'b' ? value : null
       const updated = field === 'dayOfWeek'
         ? { ...assignment, dayOfWeek: Number(value) }
         : field === 'route' ? { ...assignment, route: value }
-          : field === 'containerSize' ? { ...assignment, containerSize: value } : assignment
+          : field === 'containerSize' ? { ...assignment, containerSize: value }
+            : field === 'weekCycle' ? { ...assignment, weekCycle } : assignment
       return { ...current, services: [...current.services.filter((item) => item.service !== service), updated] }
     })
   }
@@ -333,7 +339,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
   }
 
   const downloadTemplate = () => {
-    const content = 'address,direction1,street,streetSuffix,direction2,unit,city,state,zip,county,community,latitude,longitude,trash,trashRoute,trashDay,trashContainerSize,recycle,recycleRoute,recycleDay,recycleContainerSize,yardWaste,yardWasteRoute,yardWasteDay,yardWasteContainerSize\n1234,SW,Main,St,,Apt 12,Kansas City,KS,64101,Jackson,Example HOA,39.0997,-94.5786,yes,RT08,Monday,95g,yes,RR14,Thursday,65g,yes,RY04,Tuesday,\n'
+    const content = 'address,direction1,street,streetSuffix,direction2,unit,city,state,zip,county,community,latitude,longitude,trash,trashRoute,trashDay,trashWeek,trashContainerSize,recycle,recycleRoute,recycleDay,recycleWeek,recycleContainerSize,yardWaste,yardWasteRoute,yardWasteDay,yardWasteWeek,yardWasteContainerSize\n1234,SW,Main,St,,Apt 12,Kansas City,KS,64101,Jackson,Example HOA,39.0997,-94.5786,yes,RT08,Monday,,95g,yes,RR14,Thursday,A,65g,yes,RY04,Tuesday,,\n'
     const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }))
     const link = document.createElement('a')
     link.href = url
@@ -429,9 +435,10 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
               </div>
               <div>
                 <p className="font-semibold text-slate-800">Service headers (all optional)</p>
-                <p className="mt-1"><code>trash</code>, <code>trashRoute</code>, <code>trashDay</code>, <code>trashContainerSize</code></p>
-                <p className="mt-1"><code>recycle</code>, <code>recycleRoute</code>, <code>recycleDay</code>, <code>recycleContainerSize</code></p>
-                <p className="mt-1"><code>yardWaste</code>, <code>yardWasteRoute</code>, <code>yardWasteDay</code>, <code>yardWasteContainerSize</code></p>
+                <p className="mt-1"><code>trash</code>, <code>trashRoute</code>, <code>trashDay</code>, <code>trashWeek</code>, <code>trashContainerSize</code></p>
+                <p className="mt-1"><code>recycle</code>, <code>recycleRoute</code>, <code>recycleDay</code>, <code>recycleWeek</code>, <code>recycleContainerSize</code></p>
+                <p className="mt-1"><code>yardWaste</code>, <code>yardWasteRoute</code>, <code>yardWasteDay</code>, <code>yardWasteWeek</code>, <code>yardWasteContainerSize</code></p>
+                <p className="mt-1 text-slate-500">Leave the week column blank for every week, or enter <code>A</code> or <code>B</code>.</p>
               </div>
             </div>
             <div className="mt-4 border-t border-slate-200 pt-3">
@@ -539,7 +546,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
                 {serviceTypes.map((serviceType) => {
                   const assignment = form.services.find((item) => item.service === serviceType.value)
                   return (
-                    <div key={serviceType.value} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[140px_1fr_160px_180px] sm:items-center">
+                    <div key={serviceType.value} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[140px_1fr_140px_150px_140px] sm:items-center">
                       <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                         <input type="checkbox" checked={Boolean(assignment)} onChange={(event) => updateService(serviceType.value, event.target.checked)} />
                         {serviceType.label}
@@ -550,6 +557,9 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
                       </select>
                       <select disabled={!assignment} value={assignment?.dayOfWeek ?? 1} onChange={(event) => updateService(serviceType.value, true, 'dayOfWeek', event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
                         {dayNames.map((day, index) => <option key={day} value={index}>{day}</option>)}
+                      </select>
+                      <select disabled={!assignment} value={assignment?.weekCycle ?? ''} onChange={(event) => updateService(serviceType.value, true, 'weekCycle', event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50">
+                        <option value="">Every Week</option><option value="a">A Week</option><option value="b">B Week</option>
                       </select>
                     </div>
                   )
@@ -609,7 +619,7 @@ export function AddressesClient({ addresses, cities, communities, companySlug }:
                 <td className="px-6 py-4 text-sm text-slate-600">{record.community?.name ?? '—'}</td>
                 <td className="px-6 py-4 text-xs text-slate-600">
                   {record.services.length ? record.services.map((service) => (
-                    <div key={service.id}><span className="font-medium capitalize">{service.service.replace('_', ' ')}</span>: {dayNames[service.dayOfWeek]}{service.route ? ` · ${service.route}` : ''}{service.containerSize ? ` · ${service.containerSize}` : ''}</div>
+                    <div key={service.id}><span className="font-medium capitalize">{service.service.replace('_', ' ')}</span>: {dayNames[service.dayOfWeek]} · {service.weekCycle === 'a' ? 'A Week' : service.weekCycle === 'b' ? 'B Week' : 'Every Week'}{service.route ? ` · ${service.route}` : ''}{service.containerSize ? ` · ${service.containerSize}` : ''}</div>
                   )) : '—'}
                 </td>
                 <td className="px-6 py-4">

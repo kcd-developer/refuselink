@@ -53,6 +53,7 @@ export async function createCommunityAnnouncement(companySlug: string, input: un
   const data = parsed.data
   const authorization = await customerAuthorization(companySlug, data.communityId)
   if (!authorization) return { error: 'You cannot create announcements for this community' }
+  if (authorization.role !== 'board_member') return { error: 'Only board members can create community announcements' }
 
   const announcement = await prisma.communityAnnouncement.create({
     data: {

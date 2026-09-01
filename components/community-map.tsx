@@ -8,7 +8,7 @@ export interface CommunityMapPoint {
   address2: string | null
   latitude: number
   longitude: number
-  services: Array<{ service: string; route: string | null; containerSize?: string | null; dayOfWeek: number }>
+  services: Array<{ service: string; route: string | null; containerSize?: string | null; dayOfWeek: number; weekCycle?: string | null }>
 }
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

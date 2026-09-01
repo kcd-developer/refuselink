@@ -15,6 +15,7 @@ const serviceAssignmentSchema = z.object({
   route: z.string().trim().max(100).optional().nullable(),
   containerSize: z.string().trim().max(30).optional().nullable(),
   dayOfWeek: z.number().int().min(0).max(6),
+  weekCycle: z.enum(['a', 'b']).optional().nullable(),
 })
 
 const coordinateSchema = (
@@ -55,14 +56,17 @@ const importRowSchema = addressSchema.omit({ communityId: true, services: true }
   trash: z.string().trim().optional(),
   trashRoute: z.string().trim().max(100).optional(),
   trashDay: z.string().trim().optional(),
+  trashWeek: z.string().trim().optional(),
   trashContainerSize: z.string().trim().max(30).optional(),
   recycle: z.string().trim().optional(),
   recycleRoute: z.string().trim().max(100).optional(),
   recycleDay: z.string().trim().optional(),
+  recycleWeek: z.string().trim().optional(),
   recycleContainerSize: z.string().trim().max(30).optional(),
   yardWaste: z.string().trim().optional(),
   yardWasteRoute: z.string().trim().max(100).optional(),
   yardWasteDay: z.string().trim().optional(),
+  yardWasteWeek: z.string().trim().optional(),
   yardWasteContainerSize: z.string().trim().max(30).optional(),
 })
 
@@ -145,21 +149,28 @@ function isEnabled(value?: string) {
   return ['1', 'true', 'yes', 'y', 'x'].includes(value?.trim().toLocaleLowerCase() ?? '')
 }
 
+function parseWeekCycle(value?: string): 'a' | 'b' | null {
+  const normalized = value?.trim().toLocaleLowerCase()
+  if (!normalized) return null
+  if (normalized === 'a' || normalized === 'b') return normalized
+  throw new Error(`service week must be A, B, or blank`)
+}
+
 function servicesFromImport(row: AddressImportRow, uppercaseRoutes = false) {
   const definitions = [
-    { service: 'trash' as const, enabled: row.trash, route: row.trashRoute, day: row.trashDay, containerSize: row.trashContainerSize },
-    { service: 'recycling' as const, enabled: row.recycle, route: row.recycleRoute, day: row.recycleDay, containerSize: row.recycleContainerSize },
-    { service: 'yard_waste' as const, enabled: row.yardWaste, route: row.yardWasteRoute, day: row.yardWasteDay, containerSize: row.yardWasteContainerSize },
+    { service: 'trash' as const, enabled: row.trash, route: row.trashRoute, day: row.trashDay, week: row.trashWeek, containerSize: row.trashContainerSize },
+    { service: 'recycling' as const, enabled: row.recycle, route: row.recycleRoute, day: row.recycleDay, week: row.recycleWeek, containerSize: row.recycleContainerSize },
+    { service: 'yard_waste' as const, enabled: row.yardWaste, route: row.yardWasteRoute, day: row.yardWasteDay, week: row.yardWasteWeek, containerSize: row.yardWasteContainerSize },
   ]
-  const mentioned = definitions.filter((item) => item.enabled !== undefined || item.route !== undefined || item.day !== undefined || item.containerSize !== undefined)
+  const mentioned = definitions.filter((item) => item.enabled !== undefined || item.route !== undefined || item.day !== undefined || item.week !== undefined || item.containerSize !== undefined)
   if (!mentioned.length) return null
 
   return mentioned.map((item) => {
-    const enabled = isEnabled(item.enabled) || Boolean(item.route?.trim()) || Boolean(item.day?.trim()) || Boolean(item.containerSize?.trim())
+    const enabled = isEnabled(item.enabled) || Boolean(item.route?.trim()) || Boolean(item.day?.trim()) || Boolean(item.week?.trim()) || Boolean(item.containerSize?.trim())
     if (!enabled) return { service: item.service, assignment: null }
     const dayOfWeek = parseDay(item.day)
     if (dayOfWeek === null) throw new Error(`${item.service.replace('_', ' ')} requires a valid service day`)
-    return { service: item.service, assignment: { route: normalizeRoute(item.route, uppercaseRoutes), containerSize: normalizeContainerSize(item.containerSize), dayOfWeek } }
+    return { service: item.service, assignment: { route: normalizeRoute(item.route, uppercaseRoutes), containerSize: normalizeContainerSize(item.containerSize), dayOfWeek, weekCycle: parseWeekCycle(item.week) } }
   })
 }
 
@@ -167,7 +178,7 @@ async function replaceServices(tx: Prisma.TransactionClient, addressId: string, 
   await tx.addressService.deleteMany({ where: { addressId } })
   if (services.length) {
     await tx.addressService.createMany({
-      data: services.map((service) => ({ addressId, service: service.service, route: normalizeRoute(service.route, uppercaseRoutes), containerSize: normalizeContainerSize(service.containerSize), dayOfWeek: service.dayOfWeek })),
+      data: services.map((service) => ({ addressId, service: service.service, route: normalizeRoute(service.route, uppercaseRoutes), containerSize: normalizeContainerSize(service.containerSize), dayOfWeek: service.dayOfWeek, weekCycle: service.weekCycle ?? null })),
     })
   }
 }

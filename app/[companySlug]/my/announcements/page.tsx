@@ -127,7 +127,7 @@ export default async function CustomerAnnouncementsPage({ params }: { params: Pr
       companyName={company?.name ?? 'Service Company'}
       announcements={feed}
       creationCommunities={creationCommunities}
-      canCreate={viewContext.active.mode !== 'resident' && creationCommunities.length > 0}
+      canCreate={viewContext.active.mode === 'board' && creationCommunities.length > 0}
       />
     </>
   )
