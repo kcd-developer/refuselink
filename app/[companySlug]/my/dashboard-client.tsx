@@ -111,7 +111,7 @@ export function CustomerDashboardClient({
                 width={yardWasteService?.containerSize ? 520 : 360}
                 height={yardWasteService?.containerSize ? 500 : 540}
                 priority
-                className={`absolute object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.25)] ${yardWasteService?.containerSize ? 'bottom-[clamp(-3.25rem,-4vw,-2.1rem)] h-[clamp(12rem,29vw,18rem)] w-[clamp(12.75rem,31vw,19.25rem)]' : 'bottom-[clamp(-0.75rem,-1vw,0.25rem)] h-[clamp(8rem,20vw,12rem)] w-[clamp(6.5rem,16vw,9.5rem)]'} ${hasOtherCartService ? 'right-[clamp(12rem,23vw,20rem)] z-0' : 'right-[clamp(0rem,2vw,3rem)] z-10'}`}
+                className={`absolute object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.25)] ${yardWasteService?.containerSize ? 'bottom-[clamp(-3.25rem,-4vw,-2.1rem)] h-[clamp(12rem,29vw,18rem)] w-[clamp(12.75rem,31vw,19.25rem)]' : 'bottom-[clamp(-0.75rem,-1vw,0.25rem)] h-28 w-[5.5rem] min-[480px]:h-[clamp(8rem,20vw,12rem)] min-[480px]:w-[clamp(6.5rem,16vw,9.5rem)]'} ${hasOtherCartService ? 'right-[5.75rem] z-0 min-[480px]:right-[8rem] sm:right-[clamp(12rem,23vw,20rem)]' : 'right-[-1.5rem] z-10 sm:right-[clamp(0rem,2vw,3rem)]'}`}
               />
             )}
             {hasRecyclingService && (
@@ -121,7 +121,7 @@ export function CustomerDashboardClient({
                 width={520}
                 height={500}
                 priority
-                className={`absolute bottom-[clamp(-3.25rem,-4vw,-2.1rem)] h-[clamp(13rem,32vw,20rem)] w-[clamp(13.75rem,34vw,21.25rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)] ${hasTrashAndRecycling ? 'right-[clamp(3.5rem,8vw,7rem)] z-10 scale-[0.94]' : 'right-[clamp(-3.25rem,-4vw,0.5rem)] z-10'}`}
+                className={`absolute bottom-[clamp(-3.25rem,-4vw,-2.1rem)] h-[clamp(13rem,32vw,20rem)] w-[clamp(13.75rem,34vw,21.25rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)] ${hasTrashAndRecycling ? 'right-[1.25rem] z-10 scale-[0.94] sm:right-[clamp(3.5rem,8vw,7rem)]' : 'right-[-2.75rem] z-10 sm:right-[clamp(-3.25rem,-4vw,0.5rem)]'}`}
               />
             )}
             {hasTrashService && (
@@ -131,7 +131,7 @@ export function CustomerDashboardClient({
                 width={520}
                 height={500}
                 priority
-                className="absolute bottom-[clamp(-3.25rem,-4vw,-2.1rem)] right-[clamp(-3.25rem,-4vw,0.5rem)] z-10 h-[clamp(13rem,32vw,20rem)] w-[clamp(13.75rem,34vw,21.25rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)]"
+                className="absolute bottom-[clamp(-3.25rem,-4vw,-2.1rem)] right-[-2.75rem] z-10 h-[clamp(13rem,32vw,20rem)] w-[clamp(13.75rem,34vw,21.25rem)] object-contain drop-shadow-[0_18px_18px_rgba(0,0,0,0.28)] sm:right-[clamp(-3.25rem,-4vw,0.5rem)]"
               />
             )}
           </div>
