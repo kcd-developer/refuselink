@@ -4,6 +4,7 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { getCustomerViewContext } from '@/lib/customer-view'
 import Link from 'next/link'
 import { ArrowRight, ChevronDown, MapPin } from 'lucide-react'
+import { visibleCommunityContact } from '@/lib/community-contact-privacy'
 import { getTicketActivityLabel } from '@/lib/ticket-activity'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +39,7 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
   if (!communityIds.length) redirect(`/${companySlug}/my`)
   const elevatedIds = new Set(viewContext.active.mode === 'resident' ? [] : communityIds)
 
-  const communities = await prisma.community.findMany({
+  const communityRows = await prisma.community.findMany({
     where: { id: { in: communityIds }, companyId: user.companyId! },
     include: {
       city: { select: { name: true, state: true } },
@@ -53,6 +54,15 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
     },
     orderBy: { name: 'asc' },
   })
+
+  const boardCommunityIds = new Set(viewContext.options.filter((option) => option.mode === 'board').map((option) => option.communityId))
+  const communities = communityRows.map((community) => ({
+    ...community,
+    memberships: community.memberships.map((membership) => ({
+      ...membership,
+      ...visibleCommunityContact(membership, boardCommunityIds.has(community.id)),
+    })),
+  }))
 
   const issues = elevatedIds.size ? (await Promise.all([...elevatedIds].map((communityId) =>
     prisma.ticket.findMany({
@@ -105,8 +115,8 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
                       <p className="font-medium text-slate-900">{membership.customerUser.name}</p>
                       <p className="text-xs text-slate-500">{membership.positionTitle || (membership.role === 'board_member' ? 'Board Member' : 'Community Manager')}</p>
                       <div className="mt-2 text-sm text-slate-600">
-                        {membership.showEmail && membership.publicEmail && <p><a className="text-blue-600 hover:underline" href={`mailto:${membership.publicEmail}`}>{membership.publicEmail}</a></p>}
-                        {membership.showPhone && membership.publicPhone && <p><a className="text-blue-600 hover:underline" href={`tel:${membership.publicPhone}`}>{membership.publicPhone}</a></p>}
+                        {membership.publicEmail && <p><a className="text-blue-600 hover:underline" href={`mailto:${membership.publicEmail}`}>{membership.publicEmail}</a></p>}
+                        {membership.publicPhone && <p><a className="text-blue-600 hover:underline" href={`tel:${membership.publicPhone}`}>{membership.publicPhone}</a></p>}
                       </div>
                     </div>
                   ))}

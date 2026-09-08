@@ -284,6 +284,8 @@ model CommunityMembership {
   publicPhone    String?
   showEmail      Boolean       @default(true)
   showPhone      Boolean       @default(true)
+  shareEmailWithCommunity Boolean @default(false)
+  sharePhoneWithCommunity Boolean @default(false)
   isActive       Boolean       @default(true)
   assignedById   String
   createdAt      DateTime      @default(now())

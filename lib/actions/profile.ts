@@ -42,3 +42,30 @@ export async function updateCustomerPassword(companySlug: string, data: { curren
     return { success: true }
   } catch { return { error: 'Failed to update password' } }
 }
+
+const contactPrivacySchema = z.object({
+  membershipId: z.string().min(1),
+  shareEmailWithCommunity: z.boolean(),
+  sharePhoneWithCommunity: z.boolean(),
+})
+
+export async function updateBoardContactPrivacy(companySlug: string, input: unknown) {
+  const user = getSessionUser(await getSession())
+  if (!user || user.userType !== 'customer' || user.companySlug !== companySlug || !user.companyId) return { error: 'Unauthorized' }
+  const parsed = contactPrivacySchema.safeParse(input)
+  if (!parsed.success) return { error: 'Invalid privacy settings' }
+  const { membershipId, ...preferences } = parsed.data
+  try {
+    const result = await prisma.communityMembership.updateMany({
+      where: {
+        id: membershipId, customerUserId: user.id, role: 'board_member', isActive: true,
+        community: { companyId: user.companyId },
+      },
+      data: preferences,
+    })
+    if (!result.count) return { error: 'Active board membership not found' }
+    revalidatePath(`/${companySlug}/my/profile`)
+    revalidatePath(`/${companySlug}/my/community`)
+    return { success: true }
+  } catch { return { error: 'Failed to update privacy settings. Please try again.' } }
+}

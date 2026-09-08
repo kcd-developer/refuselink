@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { BoardContactSettings } from './board-contact-settings'
 import { User, Save, Lock, Home, Building, Truck, Eye, EyeOff } from 'lucide-react'
 import { updateCustomerProfile, updateCustomerPassword } from '@/lib/actions/profile'
 
@@ -65,6 +66,10 @@ export function ProfileClient({ customerUser, companySlug }: { customerUser: any
           </button>
         </div>
       </form>
+
+      {customerUser.communityMemberships?.map((membership: React.ComponentProps<typeof BoardContactSettings>['membership']) => (
+        <BoardContactSettings key={membership.id} membership={membership} companySlug={companySlug} />
+      ))}
 
       <form onSubmit={handleChangePassword} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
         <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2"><Lock className="h-4 w-4" /> Change Password</h3>
