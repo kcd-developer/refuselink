@@ -44,27 +44,28 @@ model Plan {
 }
 
 model Company {
-  id               String            @id @default(cuid())
-  name             String
-  slug             String            @unique
-  code             String            @unique
-  status           CompanyStatus     @default(trial)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  branding         CompanyBranding?
-  subscription     Subscription?
-  employees        CompanyUser[]
-  cities           City[]
-  communities      Community[]
-  addresses        Address[]
-  customers        Customer[]
-  announcements    Announcement[]
-  communityAnnouncements CommunityAnnouncement[]
+  id                        String                     @id @default(cuid())
+  name                      String
+  slug                      String                     @unique
+  code                      String                     @unique
+  status                    CompanyStatus              @default(trial)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  branding                  CompanyBranding?
+  subscription              Subscription?
+  employees                 CompanyUser[]
+  cities                    City[]
+  communities               Community[]
+  addresses                 Address[]
+  customers                 Customer[]
+  announcements             Announcement[]
+  communityAnnouncements    CommunityAnnouncement[]
   customerAnnouncementReads CustomerAnnouncementRead[]
-  documents        Document[]
-  serviceSchedules ServiceSchedule[]
-  tickets          Ticket[]
-  auditLogs        AuditLog[]
+  documents                 Document[]
+  serviceSchedules          ServiceSchedule[]
+  tickets                   Ticket[]
+  auditLogs                 AuditLog[]
+  serviceHoldRequests       ServiceHoldRequest[]
 }
 
 enum CompanyStatus {
@@ -155,38 +156,42 @@ model City {
 }
 
 model Community {
-  id          String                @id @default(cuid())
-  companyId   String
-  company     Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  cityId      String
-  city        City                  @relation(fields: [cityId], references: [id])
-  name        String
-  serviceIssueRouting String               @default("company")
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  addresses   Address[]
-  customers   Customer[]
-  memberships CommunityMembership[]
-  announcements CommunityAnnouncement[]
+  id                  String                  @id @default(cuid())
+  companyId           String
+  company             Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cityId              String
+  city                City                    @relation(fields: [cityId], references: [id])
+  name                String
+  serviceIssueRouting String                  @default("company")
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  addresses           Address[]
+  customers           Customer[]
+  memberships         CommunityMembership[]
+  announcements       CommunityAnnouncement[]
+  serviceHoldRequests ServiceHoldRequest[]
 }
 
 model Address {
-  id          String           @id @default(cuid())
-  companyId   String
-  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  address     String
-  address2    String?
-  cityId      String
-  city        City             @relation(fields: [cityId], references: [id])
-  communityId String?
-  community   Community?       @relation(fields: [communityId], references: [id], onDelete: SetNull)
-  zipCode     String?
-  latitude    Float?
-  longitude   Float?
-  claimedAt   DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  services    AddressService[]
+  id                     String               @id @default(cuid())
+  companyId              String
+  company                Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  address                String
+  address2               String?
+  cityId                 String
+  city                   City                 @relation(fields: [cityId], references: [id])
+  communityId            String?
+  community              Community?           @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  zipCode                String?
+  latitude               Float?
+  longitude              Float?
+  claimedAt              DateTime?
+  serviceStatus          AddressServiceStatus @default(active)
+  serviceStatusUpdatedAt DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  services               AddressService[]
+  serviceHoldRequests    ServiceHoldRequest[]
 
   @@index([companyId])
   @@index([companyId, claimedAt])
@@ -194,17 +199,63 @@ model Address {
   @@index([communityId])
 }
 
+enum AddressServiceStatus {
+  active
+  suspension_pending
+  suspended
+  restoration_pending
+}
+
+enum ServiceHoldAction {
+  suspend
+  restore
+}
+
+enum ServiceHoldRequestStatus {
+  pending
+  completed
+  rejected
+  cancelled
+}
+
+model ServiceHoldRequest {
+  id              String                   @id @default(cuid())
+  companyId       String
+  company         Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  communityId     String
+  community       Community                @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  addressId       String
+  address         Address                  @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  action          ServiceHoldAction
+  status          ServiceHoldRequestStatus @default(pending)
+  priority        TicketPriority           @default(urgent)
+  requestedById   String?
+  requestedBy     CustomerUser?            @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  requestNote     String?
+  processedById   String?
+  processedByName String?
+  internalNote    String?
+  processedAt     DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([companyId, status, createdAt])
+  @@index([communityId, status])
+  @@index([addressId, createdAt])
+  @@index([requestedById])
+}
+
 model AddressService {
-  id            String      @id @default(cuid())
+  id            String            @id @default(cuid())
   addressId     String
-  address       Address     @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  address       Address           @relation(fields: [addressId], references: [id], onDelete: Cascade)
   service       ServiceType
   route         String?
   containerSize String?
   dayOfWeek     Int
   weekCycle     ServiceWeekCycle?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@unique([addressId, service])
   @@index([addressId])
@@ -255,41 +306,42 @@ enum CustomerType {
 }
 
 model CustomerUser {
-  id                   String                @id @default(cuid())
-  email                String                @unique
-  password             String
-  name                 String
-  phone                String?
-  isActive             Boolean               @default(true)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  accounts             CustomerUserAccess[]
-  communityMemberships CommunityMembership[]
-  managerTicketReads ManagerTicketRead[]
-  customerTicketReads CustomerTicketRead[]
-  communityAnnouncements CommunityAnnouncement[]
-  companyAnnouncementReads CustomerAnnouncementRead[]
+  id                         String                              @id @default(cuid())
+  email                      String                              @unique
+  password                   String
+  name                       String
+  phone                      String?
+  isActive                   Boolean                             @default(true)
+  createdAt                  DateTime                            @default(now())
+  updatedAt                  DateTime                            @updatedAt
+  accounts                   CustomerUserAccess[]
+  communityMemberships       CommunityMembership[]
+  managerTicketReads         ManagerTicketRead[]
+  customerTicketReads        CustomerTicketRead[]
+  communityAnnouncements     CommunityAnnouncement[]
+  companyAnnouncementReads   CustomerAnnouncementRead[]
   communityAnnouncementReads CustomerCommunityAnnouncementRead[]
+  serviceHoldRequests        ServiceHoldRequest[]
 }
 
 model CommunityMembership {
-  id             String        @id @default(cuid())
-  communityId    String
-  community      Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  customerUserId String
-  customerUser   CustomerUser  @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
-  role           CommunityRole
-  positionTitle  String?
-  publicEmail    String?
-  publicPhone    String?
-  showEmail      Boolean       @default(true)
-  showPhone      Boolean       @default(true)
-  shareEmailWithCommunity Boolean @default(false)
-  sharePhoneWithCommunity Boolean @default(false)
-  isActive       Boolean       @default(true)
-  assignedById   String
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                      String        @id @default(cuid())
+  communityId             String
+  community               Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  customerUserId          String
+  customerUser            CustomerUser  @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  role                    CommunityRole
+  positionTitle           String?
+  publicEmail             String?
+  publicPhone             String?
+  showEmail               Boolean       @default(true)
+  showPhone               Boolean       @default(true)
+  shareEmailWithCommunity Boolean       @default(false)
+  sharePhoneWithCommunity Boolean       @default(false)
+  isActive                Boolean       @default(true)
+  assignedById            String
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   @@unique([communityId, customerUserId, role])
   @@index([customerUserId])
@@ -313,22 +365,22 @@ model CustomerUserAccess {
 }
 
 model Announcement {
-  id                 String               @id @default(cuid())
+  id                 String                     @id @default(cuid())
   companyId          String
-  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company            Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   title              String
   content            String
-  priority           AnnouncementPriority @default(normal)
+  priority           AnnouncementPriority       @default(normal)
   startDate          DateTime
   endDate            DateTime?
-  isPublished        Boolean              @default(false)
-  targetAll          Boolean              @default(true)
+  isPublished        Boolean                    @default(false)
+  targetAll          Boolean                    @default(true)
   targetTypes        CustomerType[]
   targetCityIds      String[]
   targetCommunityIds String[]
   createdById        String
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
   customerReads      CustomerAnnouncementRead[]
 }
 
@@ -340,22 +392,22 @@ enum AnnouncementPriority {
 }
 
 model CommunityAnnouncement {
-  id            String               @id @default(cuid())
+  id            String                              @id @default(cuid())
   companyId     String
-  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company       Company                             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   communityId   String
-  community     Community            @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  community     Community                           @relation(fields: [communityId], references: [id], onDelete: Cascade)
   title         String
   content       String
-  priority      AnnouncementPriority @default(normal)
-  startDate     DateTime             @default(now())
+  priority      AnnouncementPriority                @default(normal)
+  startDate     DateTime                            @default(now())
   endDate       DateTime?
-  isPublished   Boolean              @default(true)
+  isPublished   Boolean                             @default(true)
   createdById   String
-  createdBy     CustomerUser         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy     CustomerUser                        @relation(fields: [createdById], references: [id], onDelete: Cascade)
   createdByRole CommunityRole
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  createdAt     DateTime                            @default(now())
+  updatedAt     DateTime                            @updatedAt
   customerReads CustomerCommunityAnnouncementRead[]
 
   @@index([companyId, isPublished])
@@ -383,7 +435,7 @@ model CustomerCommunityAnnouncementRead {
   communityAnnouncement   CommunityAnnouncement @relation(fields: [communityAnnouncementId], references: [id], onDelete: Cascade)
   customerUserId          String
   customerUser            CustomerUser          @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
-  viewedAt                 DateTime              @default(now())
+  viewedAt                DateTime              @default(now())
 
   @@unique([communityAnnouncementId, customerUserId])
   @@index([customerUserId])
@@ -443,27 +495,27 @@ model ScheduleException {
 }
 
 model Ticket {
-  id            String          @id @default(cuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customerId    String
-  customer      Customer        @relation(fields: [customerId], references: [id])
-  ticketNumber  String
-  subject       String
-  category      TicketCategory  @default(other)
-  status        TicketStatus    @default(open)
-  priority      TicketPriority  @default(normal)
-  serviceRecipient String        @default("company")
-  escalatedAt    DateTime?
-  assignedToId  String?
-  assignedTo    CompanyUser?    @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  createdById   String
-  createdByType String
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  messages      TicketMessage[]
-  managerReads  ManagerTicketRead[]
-  customerReads CustomerTicketRead[]
+  id               String               @id @default(cuid())
+  companyId        String
+  company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId       String
+  customer         Customer             @relation(fields: [customerId], references: [id])
+  ticketNumber     String
+  subject          String
+  category         TicketCategory       @default(other)
+  status           TicketStatus         @default(open)
+  priority         TicketPriority       @default(normal)
+  serviceRecipient String               @default("company")
+  escalatedAt      DateTime?
+  assignedToId     String?
+  assignedTo       CompanyUser?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  createdById      String
+  createdByType    String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  messages         TicketMessage[]
+  managerReads     ManagerTicketRead[]
+  customerReads    CustomerTicketRead[]
 
   @@unique([companyId, ticketNumber])
   @@index([companyId, serviceRecipient])

@@ -7,7 +7,7 @@ import { signOut, useSession } from 'next-auth/react'
 import {
   LayoutDashboard, Users, MapPin, Map, Building, Megaphone,
   FileText, Calendar, Ticket, UserCog, Settings, LogOut,
-  ChevronLeft, ChevronRight, User
+  ChevronLeft, ChevronRight, User, ShieldAlert
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -16,9 +16,10 @@ interface CompanySidebarProps {
   companySlug: string
   companyName: string
   primaryColor?: string
+  pendingServiceHoldCount?: number
 }
 
-export function CompanySidebar({ companySlug, companyName, primaryColor }: CompanySidebarProps) {
+export function CompanySidebar({ companySlug, companyName, primaryColor, pendingServiceHoldCount = 0 }: CompanySidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const { data: session } = useSession() || {}
@@ -34,6 +35,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
     { href: `/${companySlug}/documents`, label: 'Documents', icon: FileText, roles: ['company_owner', 'company_admin', 'company_manager', 'csr'] },
     { href: `/${companySlug}/service-schedules`, label: 'Schedules', icon: Calendar, roles: ['company_owner', 'company_admin', 'company_manager', 'dispatcher'] },
     { href: `/${companySlug}/tickets`, label: 'Tickets', icon: Ticket, roles: ['company_owner', 'company_admin', 'company_manager', 'csr', 'dispatcher'] },
+    { href: `/${companySlug}/service-holds`, label: 'Service Holds', icon: ShieldAlert, roles: ['company_owner', 'company_admin', 'company_manager'], badge: pendingServiceHoldCount },
     { href: `/${companySlug}/employees`, label: 'Employees', icon: UserCog, roles: ['company_owner', 'company_admin'] },
     { href: `/${companySlug}/settings`, label: 'Settings', icon: Settings, roles: ['company_owner', 'company_admin'] },
     { href: `/${companySlug}/profile`, label: 'My Profile', icon: User, roles: ['company_owner', 'company_admin', 'company_manager', 'csr', 'dispatcher'] },
@@ -79,6 +81,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor }: Compa
             >
               <item.icon className="h-5 w-5 flex-shrink-0" style={!isActive ? { color: 'var(--company-secondary)' } : undefined} />
               {!collapsed && <span>{item.label}</span>}
+              {item.badge > 0 && <span className="ml-auto flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">{item.badge > 99 ? '99+' : item.badge}</span>}
             </Link>
           )
         })}

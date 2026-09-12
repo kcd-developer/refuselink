@@ -80,6 +80,13 @@ export function CustomerDashboardClient({
     (addressServices ?? []).find(
       (item: any) => item.customerId === primaryAccount?.id,
     )?.services ?? [];
+  const primaryServiceStatus =
+    (addressServices ?? []).find(
+      (item: any) => item.customerId === primaryAccount?.id,
+    )?.serviceStatus ?? "active";
+  const serviceSuspended =
+    primaryServiceStatus === "suspended" ||
+    primaryServiceStatus === "restoration_pending";
   const dashboardServices = primaryServices.length
     ? primaryServices
     : allServices;
@@ -227,6 +234,13 @@ export function CustomerDashboardClient({
           />
         )}
       </section>
+
+      {serviceSuspended && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Service is currently unavailable for this address.</p>
+          <p className="mt-1">Please contact your homeowners association for more information. New service requests cannot be submitted while service is suspended.</p>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-3">
         {stats.map(({ label, value, icon: Icon, accent }) => (

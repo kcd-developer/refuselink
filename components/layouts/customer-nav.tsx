@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, User, Megaphone, FileText, Calendar,
-  Ticket, LogOut, Menu, X, ChevronDown, Check, Settings
+  Ticket, LogOut, Menu, X, ChevronDown, Check, Settings, ShieldAlert
 } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -85,6 +85,7 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
   ]
   const elevatedNavItems = [
     { href: `/${companySlug}/my/community`, label: viewContext.active.allCommunities ? 'Communities' : 'Community', icon: Building2, exact: true },
+    { href: `/${companySlug}/my/service-holds`, label: 'Service Holds', icon: ShieldAlert },
     { href: `/${companySlug}/my/announcements`, label: 'Announcements', icon: Megaphone, badge: unreadAnnouncements },
     { href: `/${companySlug}/my/documents`, label: 'Documents', icon: FileText },
     ...(viewContext.active.mode === 'board' ? [{ href: `/${companySlug}/my/community/settings`, label: 'Settings', icon: Settings }] : []),

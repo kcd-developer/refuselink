@@ -5,6 +5,7 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
 import { generateTicketNumber } from '@/lib/ticket-number'
 import { z } from 'zod'
+import { address2Compatible, normalizeAddressText } from '@/lib/address-claim'
 
 const ticketSchema = z.object({
   subject: z.string().trim().min(1).max(200),
@@ -32,11 +33,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
       customerId,
       customer: { companyId: user.companyId ?? '' },
     },
-    include: { customer: { select: { community: { select: { serviceIssueRouting: true, memberships: { where: { role: 'community_manager', isActive: true }, select: { id: true }, take: 1 } } } } } },
+    include: { customer: { select: { address: true, address2: true, cityId: true, community: { select: { serviceIssueRouting: true, memberships: { where: { role: 'community_manager', isActive: true }, select: { id: true }, take: 1 } } } } } },
   })
 
   if (!access) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
+
+  const addressCandidates = access.customer.cityId ? await prisma.address.findMany({
+    where: { companyId: user.companyId ?? '', cityId: access.customer.cityId },
+    select: { address: true, address2: true, serviceStatus: true },
+  }) : []
+  const serviceAddress = addressCandidates.find((address) =>
+    normalizeAddressText(address.address) === normalizeAddressText(access.customer.address) &&
+    address2Compatible(address.address2, access.customer.address2),
+  )
+  if (serviceAddress && ['suspended', 'restoration_pending'].includes(serviceAddress.serviceStatus)) {
+    return NextResponse.json({ error: 'Service is currently unavailable for this address. Please contact your homeowners association for more information.' }, { status: 403 })
   }
 
   const ticketNumber = await generateTicketNumber(user.companyId ?? '')

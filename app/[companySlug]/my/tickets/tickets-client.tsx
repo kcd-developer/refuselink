@@ -15,7 +15,7 @@ const statusLabels: Record<string, string> = {
   resolved: 'Resolved', closed: 'Closed',
 }
 
-export function CustomerTicketsClient({ tickets, companySlug, customerIds, requestRecipient, communityName }: { tickets: any[]; companySlug: string; customerIds: string[]; requestRecipient: 'company' | 'community_manager'; communityName: string | null }) {
+export function CustomerTicketsClient({ tickets, companySlug, customerIds, requestRecipient, communityName, serviceStatus }: { tickets: any[]; companySlug: string; customerIds: string[]; requestRecipient: 'company' | 'community_manager'; communityName: string | null; serviceStatus: string }) {
   const [showCreate, setShowCreate] = useState(false)
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState('missed_pickup')
@@ -23,6 +23,7 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds, reque
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const serviceSuspended = serviceStatus === 'suspended' || serviceStatus === 'restoration_pending'
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,10 +48,12 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds, reque
           <h1 className="font-display text-2xl font-bold text-slate-900 tracking-tight">Support Tickets</h1>
           <p className="text-sm text-slate-500 mt-1">Submit and track service requests</p>
         </div>
-        {customerIds.length > 0 && <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+        {customerIds.length > 0 && !serviceSuspended && <button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
           <Plus className="h-4 w-4" /> New Ticket
         </button>}
       </div>
+
+      {serviceSuspended && <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-semibold">Service is currently unavailable for this address.</p><p className="mt-1">Please contact your homeowners association for more information. New service requests cannot be submitted while service is suspended.</p></div>}
 
       {showCreate && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">

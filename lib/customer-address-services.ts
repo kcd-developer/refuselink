@@ -19,6 +19,7 @@ export async function getCustomerAddressServices(companyId: string, customers: C
       address: true,
       address2: true,
       cityId: true,
+      serviceStatus: true,
       services: { select: { service: true, containerSize: true, dayOfWeek: true, weekCycle: true }, orderBy: { service: 'asc' } },
     },
   })
@@ -30,6 +31,6 @@ export async function getCustomerAddressServices(companyId: string, customers: C
       address2Compatible(address.address2, customer.address2),
     )
     if (!match) return []
-    return [{ customerId: customer.id, address: match.address, address2: match.address2, services: match.services }]
+    return [{ customerId: customer.id, address: match.address, address2: match.address2, serviceStatus: match.serviceStatus, services: match.services }]
   })
 }

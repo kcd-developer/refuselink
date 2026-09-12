@@ -24,6 +24,9 @@ export default async function EmployeeLayout({
     where: { slug: resolvedParams.companySlug },
     include: { branding: true },
   })
+  const pendingServiceHoldCount = ['company_owner', 'company_admin', 'company_manager'].includes(user.role ?? '')
+    ? await prisma.serviceHoldRequest.count({ where: { companyId: user.companyId!, status: 'pending' } })
+    : 0
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -31,6 +34,7 @@ export default async function EmployeeLayout({
         companySlug={resolvedParams.companySlug}
         companyName={company?.name ?? 'Company'}
         primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
+        pendingServiceHoldCount={pendingServiceHoldCount}
       />
       <main className="flex-1 overflow-auto">
         <div className="max-w-6xl mx-auto px-6 py-8">
