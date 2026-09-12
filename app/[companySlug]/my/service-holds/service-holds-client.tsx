@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, RotateCcw, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { requestServiceHold } from '@/lib/actions/service-holds'
+import { ServiceHoldActionDialog } from '@/components/service-hold-action-dialog'
 
 const labels: Record<string, string> = {
   active: 'Active', suspension_pending: 'Suspension Pending', suspended: 'Suspended', restoration_pending: 'Restoration Pending',
@@ -16,20 +17,20 @@ export function CommunityServiceHoldsClient({ companySlug, addresses }: { compan
   const [search, setSearch] = useState('')
   const [workingId, setWorkingId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [dialogAction, setDialogAction] = useState<{ address: any; action: 'suspend' | 'restore' } | null>(null)
   const router = useRouter()
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
     return addresses.filter((item) => !query || `${item.address} ${item.address2 ?? ''} ${item.community?.name ?? ''}`.toLowerCase().includes(query))
   }, [addresses, search])
 
-  async function submit(address: any, action: 'suspend' | 'restore') {
-    const verb = action === 'suspend' ? 'suspend service at' : 'restore service at'
-    if (!window.confirm(`Request KC Disposal to ${verb} ${address.address}?`)) return
-    const note = window.prompt('Optional note for KC Disposal:')
-    if (note === null) return
+  async function submit(note: string) {
+    if (!dialogAction) return
+    const { address, action } = dialogAction
     setWorkingId(address.id); setMessage('')
     const result = await requestServiceHold(companySlug, { addressId: address.id, action, note })
     setWorkingId(null)
+    setDialogAction(null)
     if (result.error) setMessage(result.error)
     else { setMessage('Priority request sent to KC Disposal.'); router.refresh() }
   }
@@ -62,8 +63,8 @@ export function CommunityServiceHoldsClient({ companySlug, addresses }: { compan
                     : `KC Disposal did not complete the ${latest.action === 'suspend' ? 'suspension' : 'restoration'} request.`}
               </div>}
               <div className="mt-4 flex justify-end">
-                {item.serviceStatus === 'active' && <button disabled={workingId === item.id} onClick={() => submit(item, 'suspend')} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"><AlertTriangle className="h-4 w-4" /> Request Suspension</button>}
-                {item.serviceStatus === 'suspended' && <button disabled={workingId === item.id} onClick={() => submit(item, 'restore')} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Request Restoration</button>}
+                {item.serviceStatus === 'active' && <button disabled={workingId === item.id} onClick={() => setDialogAction({ address: item, action: 'suspend' })} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"><AlertTriangle className="h-4 w-4" /> Request Suspension</button>}
+                {item.serviceStatus === 'suspended' && <button disabled={workingId === item.id} onClick={() => setDialogAction({ address: item, action: 'restore' })} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Request Restoration</button>}
                 {item.serviceStatus.includes('pending') && <span className="inline-flex items-center gap-2 text-sm font-medium text-amber-700"><Clock3 className="h-4 w-4" /> Awaiting KC Disposal</span>}
                 {item.serviceStatus === 'active' && latest?.status === 'completed' && latest.action === 'restore' && <CheckCircle2 className="ml-3 h-5 w-5 text-green-600" />}
               </div>
@@ -72,6 +73,19 @@ export function CommunityServiceHoldsClient({ companySlug, addresses }: { compan
         })}
         {!filtered.length && <p className="py-12 text-center text-sm text-slate-400 lg:col-span-2">No matching addresses.</p>}
       </div>
+      {dialogAction && <ServiceHoldActionDialog
+        open
+        onOpenChange={(open) => !open && setDialogAction(null)}
+        title={dialogAction.action === 'suspend' ? 'Request service suspension?' : 'Request service restoration?'}
+        description={dialogAction.action === 'suspend' ? 'KC Disposal will receive this as a priority request. Please confirm the resident should no longer receive service.' : 'KC Disposal will receive this as a priority request to resume service at this address.'}
+        address={`${dialogAction.address.address}${dialogAction.address.address2 ? `, ${dialogAction.address.address2}` : ''}`}
+        noteLabel="Note for KC Disposal"
+        notePlaceholder="Add helpful details for the KCD team..."
+        confirmLabel="Send Priority Request"
+        tone={dialogAction.action === 'suspend' ? 'danger' : 'restore'}
+        loading={workingId === dialogAction.address.id}
+        onConfirm={submit}
+      />}
     </div>
   )
 }
