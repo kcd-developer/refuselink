@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { getCustomerViewContext } from '@/lib/customer-view'
 import { CommunityServiceHoldsClient } from './service-holds-client'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,12 +25,12 @@ export default async function CommunityServiceHoldsPage({ params }: { params: Pr
       community: { select: { id: true, name: true } },
       city: { select: { name: true, state: true } },
       serviceHoldRequests: {
-        select: { id: true, action: true, status: true, requestNote: true, internalNote: true, createdAt: true, processedAt: true, requestedBy: { select: { name: true } }, processedByName: true },
+        select: { id: true, action: true, status: true, requestNote: true, createdAt: true, processedAt: true, requestedBy: { select: { name: true } }, processedByName: true },
         orderBy: { createdAt: 'desc' }, take: 1,
       },
     },
     orderBy: [{ community: { name: 'asc' } }, { address: 'asc' }],
   })
 
-  return <CommunityServiceHoldsClient companySlug={companySlug} addresses={JSON.parse(JSON.stringify(addresses))} />
+  return <><AutoRefresh intervalMs={10000} /><CommunityServiceHoldsClient companySlug={companySlug} addresses={JSON.parse(JSON.stringify(addresses))} /></>
 }

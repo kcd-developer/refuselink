@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { EmployeeServiceHoldsClient } from './service-holds-client'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,5 +30,5 @@ export default async function EmployeeServiceHoldsPage({ params }: { params: Pro
     }),
   ])
 
-  return <EmployeeServiceHoldsClient companySlug={companySlug} requests={JSON.parse(JSON.stringify(requests))} suspendedAddresses={JSON.parse(JSON.stringify(suspendedAddresses))} />
+  return <><AutoRefresh intervalMs={10000} /><EmployeeServiceHoldsClient companySlug={companySlug} requests={JSON.parse(JSON.stringify(requests))} suspendedAddresses={JSON.parse(JSON.stringify(suspendedAddresses))} /></>
 }

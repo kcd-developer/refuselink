@@ -18,6 +18,11 @@ const processSchema = z.object({
   note: z.string().trim().max(1000).optional().nullable(),
 })
 
+const directRestoreSchema = z.object({
+  addressId: z.string().min(1),
+  note: z.string().trim().max(1000).optional().nullable(),
+})
+
 function clean(value?: string | null) {
   return value?.trim() || null
 }
@@ -139,5 +144,72 @@ export async function processServiceHoldRequest(companySlug: string, input: unkn
     return { success: true }
   } catch {
     return { error: 'The request or address status changed. Refresh and try again.' }
+  }
+}
+
+export async function restoreServiceDirectly(companySlug: string, input: unknown) {
+  const user = getSessionUser(await getSession())
+  if (!user || user.userType !== 'employee' || user.companySlug !== companySlug || !user.companyId) return { error: 'Unauthorized' }
+  if (!['company_owner', 'company_admin', 'company_manager'].includes(user.role ?? '')) return { error: 'Insufficient permissions' }
+  const parsed = directRestoreSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid request' }
+
+  const address = await prisma.address.findFirst({
+    where: { id: parsed.data.addressId, companyId: user.companyId, serviceStatus: { in: ['suspended', 'restoration_pending'] } },
+    select: { id: true, address: true, communityId: true, serviceStatus: true },
+  })
+  if (!address?.communityId) return { error: 'Suspended address not found' }
+
+  try {
+    const request = await prisma.$transaction(async (tx) => {
+      const restored = await tx.address.updateMany({
+        where: { id: address.id, companyId: user.companyId!, serviceStatus: address.serviceStatus },
+        data: { serviceStatus: 'active', serviceStatusUpdatedAt: new Date() },
+      })
+      if (!restored.count) throw new Error('STATUS_CHANGED')
+
+      if (address.serviceStatus === 'restoration_pending') {
+        const pending = await tx.serviceHoldRequest.findFirst({
+          where: { addressId: address.id, companyId: user.companyId!, action: 'restore', status: 'pending' },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        })
+        if (pending) {
+          return tx.serviceHoldRequest.update({
+            where: { id: pending.id },
+            data: { status: 'completed', processedById: user.id, processedByName: user.name, internalNote: clean(parsed.data.note), processedAt: new Date() },
+          })
+        }
+      }
+
+      return tx.serviceHoldRequest.create({
+        data: {
+          companyId: user.companyId!,
+          communityId: address.communityId!,
+          addressId: address.id,
+          action: 'restore',
+          status: 'completed',
+          requestedById: null,
+          processedById: user.id,
+          processedByName: user.name,
+          internalNote: clean(parsed.data.note),
+          processedAt: new Date(),
+        },
+      })
+    })
+    await createAuditLog({
+      companyId: user.companyId,
+      actorId: user.id,
+      actorType: 'employee',
+      actorName: user.name,
+      action: 'restore_directly',
+      entityType: 'service_hold',
+      entityId: request.id,
+      metadata: { addressId: address.id, address: address.address },
+    })
+    revalidateServiceHoldPaths(companySlug)
+    return { success: true }
+  } catch {
+    return { error: 'The address status changed. Refresh and try again.' }
   }
 }

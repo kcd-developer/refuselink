@@ -236,7 +236,7 @@ export function CustomerDashboardClient({
       </section>
 
       {serviceSuspended && (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <section className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 shadow-sm">
           <p className="font-semibold">Service is currently unavailable for this address.</p>
           <p className="mt-1">Please contact your homeowners association for more information. New service requests cannot be submitted while service is suspended.</p>
         </section>

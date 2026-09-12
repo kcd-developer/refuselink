@@ -5,6 +5,7 @@ import { CustomerDashboardClient } from './dashboard-client'
 import { getCustomerAddressServices } from '@/lib/customer-address-services'
 import { getCustomerViewContext } from '@/lib/customer-view'
 import { getCustomerCompany } from '@/lib/customer-company'
+import { AutoRefresh } from '@/components/auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,16 +71,19 @@ export default async function CustomerDashboardPage({ params }: { params: Promis
     .slice(0, 3)
 
   return (
-    <CustomerDashboardClient
-      userName={user.name}
-      companySlug={resolvedParams.companySlug}
-      primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
-      paymentUrl={showPaymentLink ? company?.branding?.paymentUrl ?? null : null}
-      paymentLabel={showPaymentLink ? company?.branding?.paymentLabel ?? null : null}
-      accounts={JSON.parse(JSON.stringify(access ?? []))}
-      openTickets={openTickets ?? 0}
-      announcements={JSON.parse(JSON.stringify(announcements ?? []))}
-      addressServices={JSON.parse(JSON.stringify(addressServices))}
-    />
+    <>
+      <AutoRefresh intervalMs={10000} />
+      <CustomerDashboardClient
+        userName={user.name}
+        companySlug={resolvedParams.companySlug}
+        primaryColor={company?.branding?.primaryColor ?? '#1D4ED8'}
+        paymentUrl={showPaymentLink ? company?.branding?.paymentUrl ?? null : null}
+        paymentLabel={showPaymentLink ? company?.branding?.paymentLabel ?? null : null}
+        accounts={JSON.parse(JSON.stringify(access ?? []))}
+        openTickets={openTickets ?? 0}
+        announcements={JSON.parse(JSON.stringify(announcements ?? []))}
+        addressServices={JSON.parse(JSON.stringify(addressServices))}
+      />
+    </>
   )
 }

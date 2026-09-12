@@ -54,7 +54,13 @@ export function CommunityServiceHoldsClient({ companySlug, addresses }: { compan
                 <div><h2 className="font-semibold text-slate-900">{item.address}{item.address2 ? `, ${item.address2}` : ''}</h2><p className="text-sm text-slate-500">{item.community?.name} · {item.city.name}, {item.city.state} {item.zipCode}</p></div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${styles[item.serviceStatus]}`}>{labels[item.serviceStatus]}</span>
               </div>
-              {latest && <p className="mt-3 text-xs text-slate-500">Latest: {latest.action === 'suspend' ? 'Suspension' : 'Restoration'} requested {new Date(latest.createdAt).toLocaleDateString()}</p>}
+              {latest && <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${latest.status === 'completed' ? 'bg-green-50 text-green-800' : latest.status === 'rejected' ? 'bg-slate-100 text-slate-700' : 'bg-amber-50 text-amber-800'}`}>
+                {latest.status === 'pending'
+                  ? `${latest.action === 'suspend' ? 'Suspension' : 'Restoration'} requested ${new Date(latest.createdAt).toLocaleString()}. KC Disposal has been notified.`
+                  : latest.status === 'completed'
+                    ? `KC Disposal completed the ${latest.action === 'suspend' ? 'service suspension' : 'service restoration'}${latest.processedAt ? ` on ${new Date(latest.processedAt).toLocaleString()}` : ''}.`
+                    : `KC Disposal did not complete the ${latest.action === 'suspend' ? 'suspension' : 'restoration'} request.`}
+              </div>}
               <div className="mt-4 flex justify-end">
                 {item.serviceStatus === 'active' && <button disabled={workingId === item.id} onClick={() => submit(item, 'suspend')} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"><AlertTriangle className="h-4 w-4" /> Request Suspension</button>}
                 {item.serviceStatus === 'suspended' && <button disabled={workingId === item.id} onClick={() => submit(item, 'restore')} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Request Restoration</button>}
