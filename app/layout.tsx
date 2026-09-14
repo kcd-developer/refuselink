@@ -23,8 +23,8 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mon
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
-  title: 'RefuseLink — Waste Management Made Simple',
-  description: 'Modern SaaS platform for waste management companies. Manage customers, schedules, tickets, and more.',
+  title: 'RefuseLink — Your Community’s Waste Service, Connected',
+  description: 'Schedules, announcements, service requests, and HOA communication—all in one convenient place for residents and community leaders.',
   icons: {
     icon: [
       { url: '/favicon-32.png?v=3', sizes: '32x32', type: 'image/png' },
@@ -33,8 +33,8 @@ export const metadata = {
     shortcut: '/favicon-32.png?v=3',
   },
   openGraph: {
-    title: 'RefuseLink — Waste Management Made Simple',
-    description: 'Modern SaaS platform for waste management companies.',
+    title: 'RefuseLink — Your Community’s Waste Service, Connected',
+    description: 'Schedules, announcements, service requests, and HOA communication for residents and community leaders.',
     images: ['/og-image.png'],
   },
 }
