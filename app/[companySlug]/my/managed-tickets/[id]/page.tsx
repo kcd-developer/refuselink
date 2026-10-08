@@ -6,6 +6,7 @@ import { CustomerTicketDetailClient } from '../../tickets/[id]/ticket-detail-cli
 import { MarkRequestsRead } from '../mark-requests-read'
 import { getCustomerCompany } from '@/lib/customer-company'
 import { AutoRefresh } from '@/components/auto-refresh'
+import { signTicketAttachmentUrls } from '@/lib/ticket-attachments'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,5 +24,6 @@ export default async function ManagedTicketDetailPage({ params }: { params: Prom
     include: { customer: { select: { name: true, address: true, address2: true, community: { select: { name: true } } } }, messages: { where: { isInternal: false }, orderBy: { createdAt: 'asc' }, include: { attachments: true } } },
   }), getCustomerCompany(user.companyId)])
   if (!ticket) return notFound()
-  return <><AutoRefresh /><MarkRequestsRead companySlug={companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={JSON.parse(JSON.stringify(ticket))} companySlug={companySlug} companyName={company?.name ?? 'Service Company'} backHref={`/${companySlug}/my/managed-tickets`} canEscalate /></>
+  const ticketWithAttachmentUrls = await signTicketAttachmentUrls(ticket)
+  return <><AutoRefresh /><MarkRequestsRead companySlug={companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={JSON.parse(JSON.stringify(ticketWithAttachmentUrls))} companySlug={companySlug} companyName={company?.name ?? 'Service Company'} backHref={`/${companySlug}/my/managed-tickets`} canEscalate /></>
 }

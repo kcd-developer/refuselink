@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { ArrowLeft, Send, Clock, ArrowUpRight, CheckCircle2, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { TicketPhotoPicker } from '@/components/ticket-photo-picker'
+import { TicketAttachmentGallery } from '@/components/ticket-attachment-gallery'
+import { uploadTicketPhotos } from '@/lib/ticket-attachments-client'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +33,9 @@ const statusLabels: Record<string, string> = {
 export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 'Service Company', backHref, canEscalate = false }: { ticket: any; companySlug: string; companyName?: string; backHref?: string; canEscalate?: boolean }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [photos, setPhotos] = useState<File[]>([])
+  const [photoError, setPhotoError] = useState('')
+  const [uploadStatus, setUploadStatus] = useState('')
   const [escalating, setEscalating] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState<'resolved' | 'closed' | null>(null)
   const [confirmAction, setConfirmAction] = useState<'resolved' | 'closed' | 'escalate' | null>(null)
@@ -38,15 +44,26 @@ export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 
   const handleSendMessage = async () => {
     if (!message.trim()) return
     setSending(true)
+    let messageWasSent = false
     try {
-      await fetch(`/api/company/${companySlug}/tickets/${ticket.id}/messages`, {
+      const response = await fetch(`/api/company/${companySlug}/tickets/${ticket.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: message, isInternal: false, authorContext: canEscalate ? 'community_manager' : 'customer' }),
       })
-      setMessage('')
+      const created = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(created.error || 'Could not send your reply.')
+      messageWasSent = true
+      if (photos.length) await uploadTicketPhotos({ companySlug, ticketId: ticket.id, messageId: created.id, files: photos, onProgress: (current, total) => setUploadStatus(`Uploading photo ${current} of ${total}...`) })
+      setMessage(''); setPhotos([]); setPhotoError(''); setUploadStatus('')
       router.refresh()
-    } catch { /* ignore */ }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Could not send your reply.'
+      if (messageWasSent) {
+        setMessage(''); setPhotos([]); setUploadStatus(''); router.refresh()
+        setPhotoError(`Your reply was sent, but ${errorMessage}`)
+      } else setPhotoError(errorMessage)
+    }
     setSending(false)
   }
 
@@ -130,6 +147,7 @@ export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 
                 </span>
               </div>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">{msg.content}</p>
+              <TicketAttachmentGallery attachments={msg.attachments ?? []} />
             </div>
           ))}
         </div>
@@ -141,10 +159,12 @@ export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 
               rows={3} placeholder="Type your reply..."
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             />
+            <div className="mt-3"><TicketPhotoPicker files={photos} onChange={setPhotos} onError={setPhotoError} disabled={sending} /></div>
+            {photoError && <p className="mt-2 text-sm text-red-600">{photoError}</p>}
             <div className="flex justify-end mt-2">
               <button onClick={handleSendMessage} disabled={sending || !message.trim()}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                <Send className="h-4 w-4" /> {sending ? 'Sending...' : 'Send Reply'}
+                <Send className="h-4 w-4" /> {sending ? (uploadStatus || 'Sending...') : 'Send Reply'}
               </button>
             </div>
           </div>

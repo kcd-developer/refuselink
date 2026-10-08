@@ -1,9 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Ticket, Plus, X, Send, MessageSquare } from 'lucide-react'
+import { Plus, X, Send, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { TicketPhotoPicker } from '@/components/ticket-photo-picker'
+import { uploadTicketPhotos } from '@/lib/ticket-attachments-client'
 
 const statusColors: Record<string, string> = {
   open: 'bg-blue-50 text-blue-700', in_progress: 'bg-yellow-50 text-yellow-700',
@@ -21,6 +24,8 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds, reque
   const [category, setCategory] = useState('missed_pickup')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [photos, setPhotos] = useState<File[]>([])
+  const [uploadStatus, setUploadStatus] = useState('')
   const [error, setError] = useState('')
   const router = useRouter()
   const serviceSuspended = serviceStatus === 'suspended' || serviceStatus === 'restoration_pending'
@@ -34,8 +39,17 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds, reque
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, message, category, customerId: customerIds[0] }),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || 'Failed to create ticket'); setLoading(false); return }
-      setShowCreate(false); setSubject(''); setMessage(''); setCategory('missed_pickup')
+      const created = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(created.error || 'Failed to create ticket'); setLoading(false); return }
+      if (photos.length && created.id && created.initialMessageId) {
+        try {
+          await uploadTicketPhotos({ companySlug, ticketId: created.id, messageId: created.initialMessageId, files: photos, onProgress: (current, total) => setUploadStatus(`Uploading photo ${current} of ${total}...`) })
+        } catch (uploadError) {
+          toast.error(uploadError instanceof Error ? `Request created, but ${uploadError.message}` : 'Request created, but the photos could not be uploaded.', { duration: 12000 })
+        }
+      }
+      setShowCreate(false); setSubject(''); setMessage(''); setCategory('missed_pickup'); setPhotos([]); setUploadStatus('')
+      router.push(`/${companySlug}/my/tickets/${created.id}`)
       router.refresh()
     } catch { setError('Failed to create ticket') }
     setLoading(false)
@@ -59,7 +73,7 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds, reque
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-900">Create Service Request</h3>
-            <button onClick={() => setShowCreate(false)} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4" /></button>
+            <button onClick={() => { setShowCreate(false); setPhotos([]); setError('') }} className="p-1 hover:bg-slate-100 rounded"><X className="h-4 w-4" /></button>
           </div>
           {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
           <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -92,9 +106,10 @@ export function CustomerTicketsClient({ tickets, companySlug, customerIds, reque
               <label className="block text-xs font-medium text-slate-500 mb-1">Details *</label>
               <textarea value={message} onChange={e => setMessage(e.target.value)} required rows={4} placeholder="Please describe your issue in detail" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
             </div>
+            <TicketPhotoPicker files={photos} onChange={setPhotos} onError={setError} disabled={loading} />
             <div className="flex justify-end">
               <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                <Send className="h-4 w-4" /> {loading ? 'Submitting...' : 'Submit Ticket'}
+                <Send className="h-4 w-4" /> {loading ? (uploadStatus || 'Submitting...') : 'Submit Ticket'}
               </button>
             </div>
           </form>

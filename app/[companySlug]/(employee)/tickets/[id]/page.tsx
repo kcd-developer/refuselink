@@ -3,6 +3,7 @@ import { getSession, getSessionUser } from '@/lib/session'
 import { redirect, notFound } from 'next/navigation'
 import { TicketDetailClient } from './ticket-detail-client'
 import { AutoRefresh } from '@/components/auto-refresh'
+import { signTicketAttachmentUrls } from '@/lib/ticket-attachments'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ c
   })
 
   if (!ticket) return notFound()
+  const ticketWithAttachmentUrls = await signTicketAttachmentUrls(ticket)
 
   const employees = await prisma.companyUser.findMany({
     where: { companyId: user.companyId ?? '', isActive: true },
@@ -33,7 +35,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ c
 
   return (
     <><AutoRefresh /><TicketDetailClient
-      ticket={JSON.parse(JSON.stringify(ticket))}
+      ticket={JSON.parse(JSON.stringify(ticketWithAttachmentUrls))}
       employees={JSON.parse(JSON.stringify(employees ?? []))}
       companySlug={resolvedParams.companySlug}
       currentUserId={user.id}

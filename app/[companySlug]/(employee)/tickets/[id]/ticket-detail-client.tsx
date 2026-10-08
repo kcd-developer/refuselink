@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { ArrowLeft, Send, Lock, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { TicketPhotoPicker } from '@/components/ticket-photo-picker'
+import { TicketAttachmentGallery } from '@/components/ticket-attachment-gallery'
+import { uploadTicketPhotos } from '@/lib/ticket-attachments-client'
 
 const statusColors: Record<string, string> = {
   open: 'bg-orange-50 text-orange-600',
@@ -20,6 +23,9 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
   const [message, setMessage] = useState('')
   const [isInternal, setIsInternal] = useState(false)
   const [sending, setSending] = useState(false)
+  const [photos, setPhotos] = useState<File[]>([])
+  const [photoError, setPhotoError] = useState('')
+  const [uploadStatus, setUploadStatus] = useState('')
   const [status, setStatus] = useState(ticket?.status ?? 'open')
   const [assignedToId, setAssignedToId] = useState(ticket?.assignedToId ?? '')
   const [managerHandling, setManagerHandling] = useState(ticket?.serviceRecipient === 'community_manager')
@@ -38,17 +44,27 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
   const handleSendMessage = async () => {
     if (!message.trim()) return
     setSending(true)
+    let messageWasSent = false
     try {
-      await fetch(`/api/company/${companySlug}/tickets/${ticket?.id}/messages`, {
+      const response = await fetch(`/api/company/${companySlug}/tickets/${ticket?.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: message, isInternal }),
       })
-      setMessage('')
+      const created = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(created.error || 'Could not send the message.')
+      messageWasSent = true
+      if (photos.length) await uploadTicketPhotos({ companySlug, ticketId: ticket.id, messageId: created.id, files: photos, onProgress: (current, total) => setUploadStatus(`Uploading photo ${current} of ${total}...`) })
+      setMessage(''); setPhotos([]); setPhotoError(''); setUploadStatus('')
       setIsInternal(false)
       router.refresh()
     } catch (err: any) {
       console.error(err)
+      const errorMessage = err instanceof Error ? err.message : 'Could not send the message.'
+      if (messageWasSent) {
+        setMessage(''); setPhotos([]); setUploadStatus(''); router.refresh()
+        setPhotoError(`The message was sent, but ${errorMessage}`)
+      } else setPhotoError(errorMessage)
     } finally {
       setSending(false)
     }
@@ -127,6 +143,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                     </span>
                   </div>
                   <p className="text-sm text-slate-700 whitespace-pre-wrap pl-9">{msg?.content ?? ''}</p>
+                  <div className="pl-9"><TicketAttachmentGallery attachments={msg?.attachments ?? []} /></div>
                 </div>
               ))}
             </div>
@@ -140,6 +157,8 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                 rows={3}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
+              <div className="mt-3"><TicketPhotoPicker files={photos} onChange={setPhotos} onError={setPhotoError} disabled={sending} /></div>
+              {photoError && <p className="mt-2 text-sm text-red-600">{photoError}</p>}
               <div className="flex items-center justify-between mt-3">
                 <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
                   <input
@@ -153,7 +172,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                   onClick={handleSendMessage} disabled={sending || !message.trim()}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
                 >
-                  <Send className="h-4 w-4" /> {sending ? 'Sending...' : 'Send'}
+                  <Send className="h-4 w-4" /> {sending ? (uploadStatus || 'Sending...') : 'Send'}
                 </button>
               </div>
             </div>}

@@ -7,6 +7,7 @@ import { CustomerTicketDetailClient } from './ticket-detail-client'
 import { MarkTicketsRead } from '../mark-tickets-read'
 import { getCustomerCompany } from '@/lib/customer-company'
 import { AutoRefresh } from '@/components/auto-refresh'
+import { signTicketAttachmentUrls } from '@/lib/ticket-attachments'
 
 export default async function CustomerTicketDetailPage({ params }: { params: Promise<{ companySlug: string; id: string }> }) {
   const resolvedParams = await params
@@ -35,5 +36,6 @@ export default async function CustomerTicketDetailPage({ params }: { params: Pro
 
   if (!ticket || !customerIds.includes(ticket.customerId)) return notFound()
 
-  return <><AutoRefresh /><MarkTicketsRead companySlug={resolvedParams.companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={ticket as any} companySlug={resolvedParams.companySlug} companyName={company?.name ?? 'Service Company'} /></>
+  const ticketWithAttachmentUrls = await signTicketAttachmentUrls(ticket)
+  return <><AutoRefresh /><MarkTicketsRead companySlug={resolvedParams.companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={ticketWithAttachmentUrls as any} companySlug={resolvedParams.companySlug} companyName={company?.name ?? 'Service Company'} /></>
 }

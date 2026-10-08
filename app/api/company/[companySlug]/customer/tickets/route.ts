@@ -78,7 +78,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
         },
       },
     },
+    include: { messages: { select: { id: true }, orderBy: { createdAt: 'asc' }, take: 1 } },
   })
 
-  return NextResponse.json({ ...ticket, serviceRecipient })
+  return NextResponse.json({ ...ticket, serviceRecipient, initialMessageId: ticket.messages[0]?.id })
 }

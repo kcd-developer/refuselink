@@ -3,6 +3,13 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getSession, getSessionUser } from '@/lib/session'
 import { prisma } from '@/lib/db'
+import { z } from 'zod'
+
+const messageSchema = z.object({
+  content: z.string().trim().min(1).max(5000),
+  isInternal: z.boolean().optional().default(false),
+  authorContext: z.enum(['customer', 'community_manager']).optional(),
+})
 
 export async function POST(req: Request, { params }: { params: Promise<{ companySlug: string; id: string }> }) {
   const resolvedParams = await params
@@ -16,7 +23,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
   })
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body = await req.json()
+  const parsed = messageSchema.safeParse(await req.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0]?.message ?? 'Invalid message' }, { status: 400 })
+  const body = parsed.data
   const requestedManagerContext = body?.authorContext === 'community_manager'
   let authorized = false
   let authorType: string = user.userType
