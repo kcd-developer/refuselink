@@ -56,7 +56,13 @@ export async function middleware(req: NextRequest) {
   const companySlug = segments[0];
   const isSignIn = segments[1] === "sign-in" && segments.length === 2;
   const isRegister = segments[1] === "register" && segments.length === 2;
+  const isInstall = segments[1] === "install" && segments.length === 2;
   const isCustomerArea = segments[1] === "my";
+
+  // Installation help must be available before and after sign-in for every user type.
+  if (isInstall) {
+    return NextResponse.next();
+  }
 
   // Sign-in and customer registration pages: allow unauthenticated, redirect signed-in users
   if (isSignIn || isRegister) {

@@ -46,6 +46,7 @@ export default function HomePage() {
             <a href="#features" className="text-sm font-semibold text-slate-600 transition hover:text-blue-700">Features</a>
             <a href="#residents" className="text-sm font-semibold text-slate-600 transition hover:text-blue-700">For Residents</a>
             <a href="#hoa-leaders" className="text-sm font-semibold text-slate-600 transition hover:text-blue-700">For HOA Leaders</a>
+            <Link href="/kc-disposal/install" className="text-sm font-semibold text-slate-600 transition hover:text-blue-700">Install</Link>
             <Link href="/contact" className="text-sm font-semibold text-slate-600 transition hover:text-blue-700">Contact</Link>
           </nav>
           <Link href="/kc-disposal/sign-in" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
@@ -74,6 +75,9 @@ export default function HomePage() {
               </Link>
               <Link href="/contact" className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-6 py-3.5 font-semibold text-white transition hover:bg-white/15">
                 Bring RefuseLink to Your HOA
+              </Link>
+              <Link href="/kc-disposal/install" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 py-3.5 font-semibold text-white transition hover:bg-white/15">
+                <Smartphone className="h-4 w-4" /> Install the App
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
@@ -236,6 +240,7 @@ export default function HomePage() {
             <a href="#features" className="hover:text-blue-700">Features</a>
             <a href="#residents" className="hover:text-blue-700">Residents</a>
             <a href="#hoa-leaders" className="hover:text-blue-700">HOA Leaders</a>
+            <Link href="/kc-disposal/install" className="hover:text-blue-700">Install</Link>
             <Link href="/contact" className="hover:text-blue-700">Contact</Link>
           </div>
           <p className="text-sm text-slate-400">© {new Date().getFullYear()} RefuseLink</p>

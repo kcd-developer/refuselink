@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, User, Megaphone, FileText, Calendar,
-  Ticket, LogOut, Menu, X, ChevronDown, Check, Settings, ShieldAlert
+  Ticket, LogOut, Menu, X, ChevronDown, Check, Settings, ShieldAlert, Download
 } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -200,6 +200,12 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
                       Profile
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-2.5 py-2 text-slate-700 focus:bg-slate-100 focus:text-slate-900">
+                    <Link href={`/${companySlug}/install`}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Install RefuseLink
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     className="cursor-pointer rounded-lg px-2.5 py-2 text-slate-700 focus:bg-slate-100 focus:text-slate-900"
                     onSelect={() => signOut({ callbackUrl: `/${companySlug}/sign-in` })}
@@ -268,6 +274,10 @@ export function CustomerNav({ companySlug, companyName, primaryColor, userName, 
             >
               <User className="h-5 w-5" style={{ color: 'var(--company-secondary)' }} />
               <span>Profile</span>
+            </Link>
+            <Link href={`/${companySlug}/install`} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">
+              <Download className="h-5 w-5" style={{ color: 'var(--company-secondary)' }} />
+              <span>Install RefuseLink</span>
             </Link>
             <button
               onClick={() => signOut({ callbackUrl: `/${companySlug}/sign-in` })}

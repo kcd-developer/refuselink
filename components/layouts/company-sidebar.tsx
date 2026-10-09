@@ -7,7 +7,7 @@ import { signOut, useSession } from 'next-auth/react'
 import {
   LayoutDashboard, Users, MapPin, Map, Building, Megaphone,
   FileText, Calendar, Ticket, UserCog, Settings, LogOut,
-  ChevronLeft, ChevronRight, User, ShieldAlert
+  ChevronLeft, ChevronRight, User, ShieldAlert, Download
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -39,6 +39,7 @@ export function CompanySidebar({ companySlug, companyName, primaryColor, pending
     { href: `/${companySlug}/employees`, label: 'Employees', icon: UserCog, roles: ['company_owner', 'company_admin'] },
     { href: `/${companySlug}/settings`, label: 'Settings', icon: Settings, roles: ['company_owner', 'company_admin'] },
     { href: `/${companySlug}/profile`, label: 'My Profile', icon: User, roles: ['company_owner', 'company_admin', 'company_manager', 'csr', 'dispatcher'] },
+    { href: `/${companySlug}/install`, label: 'Install App', icon: Download, roles: ['company_owner', 'company_admin', 'company_manager', 'csr', 'dispatcher'] },
   ]
 
   const visibleItems = navItems.filter((item: any) => item.roles.includes(role))
