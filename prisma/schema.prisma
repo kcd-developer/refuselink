@@ -170,6 +170,7 @@ model Community {
   memberships         CommunityMembership[]
   announcements       CommunityAnnouncement[]
   serviceHoldRequests ServiceHoldRequest[]
+  tickets             Ticket[]
 }
 
 model Address {
@@ -192,6 +193,7 @@ model Address {
   updatedAt              DateTime             @updatedAt
   services               AddressService[]
   serviceHoldRequests    ServiceHoldRequest[]
+  tickets                Ticket[]
 
   @@index([companyId])
   @@index([companyId, claimedAt])
@@ -498,8 +500,14 @@ model Ticket {
   id               String               @id @default(cuid())
   companyId        String
   company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customerId       String
-  customer         Customer             @relation(fields: [customerId], references: [id])
+  customerId       String?
+  customer         Customer?            @relation(fields: [customerId], references: [id])
+  communityId      String?
+  community        Community?           @relation(fields: [communityId], references: [id], onDelete: SetNull)
+  addressId        String?
+  address          Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  requestScope     String               @default("address")
+  residentVisible  Boolean              @default(true)
   ticketNumber     String
   subject          String
   category         TicketCategory       @default(other)
@@ -519,6 +527,8 @@ model Ticket {
 
   @@unique([companyId, ticketNumber])
   @@index([companyId, serviceRecipient])
+  @@index([communityId, updatedAt])
+  @@index([addressId])
 }
 
 model ManagerTicketRead {

@@ -121,6 +121,8 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
               </div>
             </div>
 
+            {ticket?.createdByType === 'community_manager' && <div className="border-b border-slate-100 px-6 py-4"><div className="flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700">Submitted by Community Manager</span>{ticket?.requestScope === 'community' ? <span className="rounded-full bg-violet-100 px-2.5 py-1 font-semibold text-violet-700">Community-Wide · {ticket?.community?.name}</span> : <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">{ticket?.address ? `${ticket.address.address}${ticket.address.address2 ? ` ${ticket.address.address2}` : ''}` : 'Specific Address'}</span>}</div></div>}
+
             {/* Messages */}
             <div className="divide-y divide-slate-50">
               {(ticket?.messages ?? []).map((msg: any) => (
@@ -186,7 +188,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
             <dl className="space-y-3">
               <div>
                 <dt className="text-xs text-slate-500">Customer</dt>
-                <dd className="text-sm text-slate-900 font-medium">{ticket?.customer?.name ?? '-'}</dd>
+                <dd className="text-sm text-slate-900 font-medium">{ticket?.requestScope === 'community' ? ticket?.community?.name ?? '-' : ticket?.address ? `${ticket.address.address}${ticket.address.address2 ? ` ${ticket.address.address2}` : ''}` : ticket?.customer?.name ?? '-'}</dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Status</dt>

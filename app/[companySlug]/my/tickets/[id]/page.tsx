@@ -34,7 +34,7 @@ export default async function CustomerTicketDetailPage({ params }: { params: Pro
     },
   }), getCustomerCompany(user.companyId!)])
 
-  if (!ticket || !customerIds.includes(ticket.customerId)) return notFound()
+  if (!ticket || !ticket.residentVisible || !ticket.customerId || !customerIds.includes(ticket.customerId)) return notFound()
 
   const ticketWithAttachmentUrls = await signTicketAttachmentUrls(ticket)
   return <><AutoRefresh /><MarkTicketsRead companySlug={resolvedParams.companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={ticketWithAttachmentUrls as any} companySlug={resolvedParams.companySlug} companyName={company?.name ?? 'Service Company'} /></>

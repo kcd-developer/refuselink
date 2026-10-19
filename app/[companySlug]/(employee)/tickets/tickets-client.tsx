@@ -27,7 +27,9 @@ export function TicketsClient({ tickets, companySlug }: { tickets: any[]; compan
   const filtered = (tickets ?? []).filter((t: any) => {
     const matchesSearch = (t?.subject ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (t?.ticketNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
-      (t?.customer?.name ?? '').toLowerCase().includes(search.toLowerCase())
+      (t?.customer?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (t?.community?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (t?.address?.address ?? '').toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'all' || t?.status === statusFilter
     const matchesRouting = routingFilter === 'all' || t?.serviceRecipient === routingFilter
     return matchesSearch && matchesStatus && matchesRouting
@@ -85,10 +87,12 @@ export function TicketsClient({ tickets, companySlug }: { tickets: any[]; compan
                   <Link href={`/${companySlug}/tickets/${ticket?.id}`} className="group">
                     <p className="text-sm font-medium text-slate-900 group-hover:text-blue-600">{ticket?.subject ?? '-'}</p>
                     <p className="text-xs text-slate-400 font-mono">{ticket?.ticketNumber ?? ''}</p>
+                    {ticket?.requestScope === 'community' && <span className="mt-1.5 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">Community-Wide · {ticket?.community?.name}</span>}
+                    {ticket?.createdByType === 'community_manager' && ticket?.requestScope !== 'community' && <span className="mt-1.5 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Community Manager · {ticket?.community?.name}</span>}
                     {ticket?.serviceRecipient === 'community_manager' && <span className="mt-1.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Community Manager handling · No action required</span>}
                   </Link>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600 hidden md:table-cell">{ticket?.customer?.name ?? '-'}</td>
+                <td className="px-6 py-4 text-sm text-slate-600 hidden md:table-cell">{ticket?.requestScope === 'community' ? ticket?.community?.name ?? '-' : ticket?.address ? `${ticket.address.address}${ticket.address.address2 ? ` ${ticket.address.address2}` : ''}` : ticket?.customer?.name ?? '-'}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[ticket?.status] ?? 'bg-slate-100 text-slate-500'}`}>
                     {(ticket?.status ?? '').replace(/_/g, ' ')}

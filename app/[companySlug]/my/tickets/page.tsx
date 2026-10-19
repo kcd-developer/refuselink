@@ -21,7 +21,7 @@ export default async function CustomerTicketsPage({ params }: { params: Promise<
   const customerIds = (access ?? []).map((a: any) => a?.customerId).filter(Boolean)
 
   const tickets = await prisma.ticket.findMany({
-    where: { companyId: user.companyId ?? '', customerId: { in: customerIds } },
+    where: { companyId: user.companyId ?? '', customerId: { in: customerIds }, residentVisible: true },
     include: {
       messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       customerReads: { where: { customerUserId: user.id }, select: { id: true } },

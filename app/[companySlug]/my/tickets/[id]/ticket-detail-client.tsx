@@ -30,7 +30,7 @@ const statusLabels: Record<string, string> = {
   resolved: 'Resolved', closed: 'Closed',
 }
 
-export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 'Service Company', backHref, canEscalate = false }: { ticket: any; companySlug: string; companyName?: string; backHref?: string; canEscalate?: boolean }) {
+export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 'Service Company', backHref, canEscalate = false, managerMode = false }: { ticket: any; companySlug: string; companyName?: string; backHref?: string; canEscalate?: boolean; managerMode?: boolean }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
@@ -49,7 +49,7 @@ export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 
       const response = await fetch(`/api/company/${companySlug}/tickets/${ticket.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: message, isInternal: false, authorContext: canEscalate ? 'community_manager' : 'customer' }),
+        body: JSON.stringify({ content: message, isInternal: false, authorContext: managerMode ? 'community_manager' : 'customer' }),
       })
       const created = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(created.error || 'Could not send your reply.')
@@ -135,6 +135,8 @@ export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 
             </div>
           )}
         </div>
+
+        {managerMode && <div className="mb-5 flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700">Community Manager Request</span>{ticket.requestScope === 'community' ? <span className="rounded-full bg-violet-100 px-2.5 py-1 font-semibold text-violet-700">Entire Community · {ticket.community?.name}</span> : <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">{ticket.address ? `${ticket.address.address}${ticket.address.address2 ? ` ${ticket.address.address2}` : ''}` : ticket.customer?.address}</span>}</div>}
 
         <div className="space-y-4 mt-6">
           {(ticket.messages ?? []).map((msg: any) => (

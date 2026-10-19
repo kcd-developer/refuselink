@@ -18,8 +18,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ com
     where: {
       id: { in: parsed.data.ticketIds },
       companyId: user.companyId,
-      serviceRecipient: 'community_manager',
-      customer: { community: { memberships: { some: { customerUserId: user.id, role: 'community_manager', isActive: true } } } },
+      community: { memberships: { some: { customerUserId: user.id, role: 'community_manager', isActive: true } } },
+      OR: [{ serviceRecipient: 'community_manager' }, { createdByType: 'community_manager' }],
     },
     select: { id: true },
   })

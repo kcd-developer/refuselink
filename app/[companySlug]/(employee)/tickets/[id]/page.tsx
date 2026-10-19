@@ -17,6 +17,8 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ c
     where: { id: resolvedParams.id, companyId: user.companyId ?? '' },
     include: {
       customer: true,
+      community: { select: { name: true } },
+      address: { select: { address: true, address2: true } },
       assignedTo: { select: { id: true, name: true } },
       messages: {
         orderBy: { createdAt: 'asc' },

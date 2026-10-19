@@ -16,8 +16,8 @@ const categoryLabels: Record<string, string> = {
 }
 const statusLabels: Record<string, string> = { open: 'Open', in_progress: 'In Progress', waiting_on_customer: 'Waiting on Resident', resolved: 'Resolved', closed: 'Closed' }
 
-function serviceAddress(customer: { address: string | null; address2: string | null }) {
-  return [customer.address, customer.address2].filter(Boolean).join(', ') || 'Address unavailable'
+function serviceAddress(customer: { address: string | null; address2: string | null } | null) {
+  return [customer?.address, customer?.address2].filter(Boolean).join(', ') || 'Address unavailable'
 }
 
 export default async function CommunityActivityPage({

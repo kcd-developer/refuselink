@@ -31,14 +31,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
   let authorType: string = user.userType
   if (user.userType === 'employee') authorized = ticket.serviceRecipient === 'company'
   if (user.userType === 'customer') {
-    if (requestedManagerContext && ticket.serviceRecipient === 'community_manager' && ticket.customer.communityId) {
+    const ticketCommunityId = ticket.communityId ?? ticket.customer?.communityId
+    if (requestedManagerContext && ticketCommunityId) {
       authorized = Boolean(await prisma.communityMembership.findFirst({
-        where: { communityId: ticket.customer.communityId, customerUserId: user.id, role: 'community_manager', isActive: true },
+        where: { communityId: ticketCommunityId, customerUserId: user.id, role: 'community_manager', isActive: true },
         select: { id: true },
       }))
       if (authorized) authorType = 'community_manager'
     } else {
-      authorized = ticket.customer.userAccess.length > 0
+      authorized = ticket.residentVisible && Boolean(ticket.customer?.userAccess.length)
       authorType = 'customer'
     }
   }
@@ -58,6 +59,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
   const readReceiptUpdate = !isInternal
     ? authorType === 'customer'
       ? prisma.managerTicketRead.deleteMany({ where: { ticketId: ticket.id } })
+      : authorType === 'employee' && ticket.createdByType === 'community_manager'
+        ? prisma.managerTicketRead.deleteMany({ where: { ticketId: ticket.id } })
       : prisma.customerTicketRead.deleteMany({ where: { ticketId: ticket.id } })
     : null
   const [message] = readReceiptUpdate

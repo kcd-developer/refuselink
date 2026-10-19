@@ -15,11 +15,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
 
   const ticket = await prisma.ticket.findFirst({
     where: { id, companyId: user.companyId, serviceRecipient: 'community_manager' },
-    select: { id: true, customer: { select: { communityId: true } } },
+    select: { id: true, communityId: true, customer: { select: { communityId: true } } },
   })
-  if (!ticket?.customer.communityId) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+  const communityId = ticket?.communityId ?? ticket?.customer?.communityId
+  if (!communityId) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
   const manager = await prisma.communityMembership.findFirst({
-    where: { communityId: ticket.customer.communityId, customerUserId: user.id, role: 'community_manager', isActive: true },
+    where: { communityId, customerUserId: user.id, role: 'community_manager', isActive: true },
     select: { id: true },
   })
   if (!manager) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

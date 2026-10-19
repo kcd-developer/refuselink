@@ -20,10 +20,10 @@ export default async function ManagedTicketDetailPage({ params }: { params: Prom
   }
   const communityIds = context.managerCommunities.map((community) => community.id)
   const [ticket, company] = await Promise.all([prisma.ticket.findFirst({
-    where: { id, companyId: user.companyId, serviceRecipient: 'community_manager', customer: { communityId: { in: communityIds } } },
-    include: { customer: { select: { name: true, address: true, address2: true, community: { select: { name: true } } } }, messages: { where: { isInternal: false }, orderBy: { createdAt: 'asc' }, include: { attachments: true } } },
+    where: { id, companyId: user.companyId, communityId: { in: communityIds }, OR: [{ serviceRecipient: 'community_manager' }, { createdByType: 'community_manager' }] },
+    include: { customer: { select: { name: true, address: true, address2: true, community: { select: { name: true } } } }, community: { select: { name: true } }, address: { select: { address: true, address2: true } }, messages: { where: { isInternal: false }, orderBy: { createdAt: 'asc' }, include: { attachments: true } } },
   }), getCustomerCompany(user.companyId)])
   if (!ticket) return notFound()
   const ticketWithAttachmentUrls = await signTicketAttachmentUrls(ticket)
-  return <><AutoRefresh /><MarkRequestsRead companySlug={companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={JSON.parse(JSON.stringify(ticketWithAttachmentUrls))} companySlug={companySlug} companyName={company?.name ?? 'Service Company'} backHref={`/${companySlug}/my/managed-tickets`} canEscalate /></>
+  return <><AutoRefresh /><MarkRequestsRead companySlug={companySlug} ticketIds={[ticket.id]} /><CustomerTicketDetailClient ticket={JSON.parse(JSON.stringify(ticketWithAttachmentUrls))} companySlug={companySlug} companyName={company?.name ?? 'Service Company'} backHref={`/${companySlug}/my/managed-tickets`} managerMode canEscalate={ticket.serviceRecipient === 'community_manager'} /></>
 }

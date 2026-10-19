@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
       customerId,
       customer: { companyId: user.companyId ?? '' },
     },
-    include: { customer: { select: { address: true, address2: true, cityId: true, community: { select: { serviceIssueRouting: true, memberships: { where: { role: 'community_manager', isActive: true }, select: { id: true }, take: 1 } } } } } },
+    include: { customer: { select: { address: true, address2: true, cityId: true, communityId: true, community: { select: { serviceIssueRouting: true, memberships: { where: { role: 'community_manager', isActive: true }, select: { id: true }, take: 1 } } } } } },
   })
 
   if (!access) {
@@ -61,6 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
     data: {
       companyId: user.companyId ?? '',
       customerId,
+      communityId: access.customer.communityId,
       ticketNumber,
       subject,
       category,

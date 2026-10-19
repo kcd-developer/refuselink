@@ -16,8 +16,8 @@ const categoryLabels: Record<string, string> = {
 }
 const statusLabels: Record<string, string> = { open: 'Open', in_progress: 'In Progress', waiting_on_customer: 'Waiting on Resident', resolved: 'Resolved', closed: 'Closed' }
 
-function serviceAddress(customer: { address: string | null; address2: string | null }) {
-  return [customer.address, customer.address2].filter(Boolean).join(', ') || 'Address unavailable'
+function serviceAddress(customer: { address: string | null; address2: string | null } | null) {
+  return [customer?.address, customer?.address2].filter(Boolean).join(', ') || 'Address unavailable'
 }
 
 export default async function CustomerCommunityPage({ params }: { params: Promise<{ companySlug: string }> }) {
@@ -103,7 +103,7 @@ export default async function CustomerCommunityPage({ params }: { params: Promis
       </div>
       <div className="space-y-6">
         {communities.map((community) => {
-          const communityIssues = issues.filter((issue) => issue.customer.communityId === community.id)
+          const communityIssues = issues.filter((issue) => issue.customer?.communityId === community.id)
           const communityContent = (
             <div className="p-6">
                 <h3 className="mb-3 text-sm font-semibold text-slate-700">

@@ -37,9 +37,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ company
 
   let authorized = user.userType === 'employee' && ticket.serviceRecipient === 'company'
   if (user.userType === 'customer') {
-    authorized = ticket.customer.userAccess.length > 0
-    if (!authorized && ticket.serviceRecipient === 'community_manager' && ticket.customer.communityId) {
-      authorized = Boolean(await prisma.communityMembership.findFirst({ where: { communityId: ticket.customer.communityId, customerUserId: user.id, role: 'community_manager', isActive: true }, select: { id: true } }))
+    authorized = ticket.residentVisible && Boolean(ticket.customer?.userAccess.length)
+    const ticketCommunityId = ticket.communityId ?? ticket.customer?.communityId
+    if (!authorized && ticketCommunityId) {
+      authorized = Boolean(await prisma.communityMembership.findFirst({ where: { communityId: ticketCommunityId, customerUserId: user.id, role: 'community_manager', isActive: true }, select: { id: true } }))
     }
   }
   if (!authorized) return NextResponse.json({ error: 'You do not have access to this request.' }, { status: 403 })

@@ -16,6 +16,8 @@ export default async function TicketsPage({ params }: { params: Promise<{ compan
     where: { companyId: user.companyId ?? '' },
     include: {
       customer: { select: { name: true, community: { select: { name: true } } } },
+      community: { select: { name: true } },
+      address: { select: { address: true, address2: true } },
       assignedTo: { select: { name: true } },
     },
     orderBy: { updatedAt: 'desc' },

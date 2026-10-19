@@ -15,14 +15,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ com
     prisma.ticket.count({
       where: {
         companyId: user.companyId,
-        serviceRecipient: 'community_manager',
         managerReads: { none: { customerUserId: user.id } },
-        customer: { community: { memberships: { some: { customerUserId: user.id, role: 'community_manager', isActive: true } } } },
+        community: { memberships: { some: { customerUserId: user.id, role: 'community_manager', isActive: true } } },
+        OR: [
+          { serviceRecipient: 'community_manager' },
+          { createdByType: 'community_manager', messages: { some: { authorType: 'employee', isInternal: false } } },
+        ],
       },
     }),
     prisma.ticket.count({
       where: {
         companyId: user.companyId,
+        residentVisible: true,
         customer: { userAccess: { some: { customerUserId: user.id } } },
         messages: { some: { authorType: { in: ['employee', 'community_manager'] }, isInternal: false } },
         customerReads: { none: { customerUserId: user.id } },
