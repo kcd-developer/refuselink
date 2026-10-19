@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Building, CheckCircle2, Plus, Pencil, Printer, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Building, CheckCircle2, LoaderCircle, Plus, Pencil, Printer, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { applyCommunityRouteAssignment, createCommunity, updateCommunity, deleteCommunity, removeCommunityServiceAssignment } from '@/lib/actions/communities'
 import { assignBoardMember, assignCommunityManager, findCommunityManagerUser, removeCommunityMembership } from '@/lib/actions/community-memberships'
@@ -15,6 +15,7 @@ interface ResidentAccess { customerUser: { id: string; name: string; email: stri
 type ManagerLookup =
   | { status: 'idle' | 'loading' | 'new' }
   | { status: 'existing'; customerUser: { id: string; name: string; email: string; phone: string | null }; alreadyAssigned: boolean }
+type BulkProgress = { status: 'applying' | 'success' | 'fading'; serviceName: string; total: number; completed: number }
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export function CommunitiesClient({ communities, companySlug, cities, residentAccess }: { communities: Community[]; companySlug: string; cities: City[]; residentAccess: ResidentAccess[] }) {
@@ -38,7 +39,15 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
   const [bulkRouteError, setBulkRouteError] = useState('')
   const [bulkRouteResult, setBulkRouteResult] = useState('')
   const [bulkRouteLoading, setBulkRouteLoading] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<BulkProgress | null>(null)
   const [editingService, setEditingService] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (bulkProgress?.status !== 'success') return
+    const fadeTimer = window.setTimeout(() => setBulkProgress((current) => current?.status === 'success' ? { ...current, status: 'fading' } : current), 3500)
+    const removeTimer = window.setTimeout(() => { setBulkProgress(null); setBulkRouteResult('') }, 4200)
+    return () => { window.clearTimeout(fadeTimer); window.clearTimeout(removeTimer) }
+  }, [bulkProgress?.status])
 
   const resetForm = () => { setShowForm(false); setEditing(null); setName(''); setCityId(''); setError('') }
   const resetServiceEditor = () => {
@@ -46,6 +55,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
     setBulkRoute({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1, weekCycle: null })
     setBulkRouteError('')
     setBulkRouteResult('')
+    setBulkProgress(null)
   }
   const resetManagerAssignment = () => {
     setManager({ name: '', email: '', phone: '', password: '', positionTitle: 'Community Manager' })
@@ -159,18 +169,22 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
     const serviceName = serviceLabels[bulkRoute.service as keyof typeof serviceLabels]
     if (!window.confirm(`Apply ${serviceName} route ${savedRoute} on ${dayNames[bulkRoute.dayOfWeek]} to all ${selected._count.addresses} addresses in ${selected.name}?`)) return
     setBulkRouteLoading(true); setBulkRouteError(''); setBulkRouteResult('')
+    setBulkProgress({ status: 'applying', serviceName, total: selected._count.addresses, completed: 0 })
     let result
     try {
       result = await applyCommunityRouteAssignment(companySlug, selected.id, { ...bulkRoute, route: savedRoute })
     } catch (error) {
       console.error(error)
       setBulkRouteLoading(false)
+      setBulkProgress(null)
       setBulkRouteError('The service assignment did not finish. Please try again; retrying will not create duplicates.')
       return
     }
     setBulkRouteLoading(false)
-    if (result.error) { setBulkRouteError(result.error); return }
-    setBulkRouteResult(`Updated ${result.updated} addresses.`)
+    if (result.error) { setBulkProgress(null); setBulkRouteError(result.error); return }
+    const updatedCount = result.updated ?? selected._count.addresses
+    setBulkRouteResult(`Updated ${updatedCount} addresses.`)
+    setBulkProgress({ status: 'success', serviceName, total: updatedCount, completed: updatedCount })
     setSelected((current) => current ? {
       ...current,
       serviceSummaries: [
@@ -319,7 +333,26 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
               <p className="text-sm text-slate-500">Assign or replace one service route and collection day for all {selected._count.addresses} addresses. Other services are not changed.</p>
             </div>
             {bulkRouteError && <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{bulkRouteError}</div>}
-            {bulkRouteResult && <div className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">{bulkRouteResult}</div>}
+            {bulkProgress && (
+              <div className={`mt-4 overflow-hidden rounded-xl border p-4 shadow-sm transition-all duration-700 ${bulkProgress.status === 'applying' ? 'border-blue-200 bg-blue-50' : 'border-emerald-200 bg-emerald-50'} ${bulkProgress.status === 'fading' ? 'translate-y-1 opacity-0' : 'translate-y-0 opacity-100'}`} role="status" aria-live="polite">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${bulkProgress.status === 'applying' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                    {bulkProgress.status === 'applying' ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-6 w-6" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className={`font-semibold ${bulkProgress.status === 'applying' ? 'text-blue-950' : 'text-emerald-950'}`}>{bulkProgress.status === 'applying' ? `Applying ${bulkProgress.serviceName} service…` : 'All done!'}</p>
+                      <p className={`whitespace-nowrap text-sm font-semibold tabular-nums ${bulkProgress.status === 'applying' ? 'text-blue-700' : 'text-emerald-700'}`}>{bulkProgress.status === 'applying' ? `${bulkProgress.total} addresses queued` : `${bulkProgress.completed} of ${bulkProgress.total} complete`}</p>
+                    </div>
+                    <div className={`mt-2 h-2 overflow-hidden rounded-full ${bulkProgress.status === 'applying' ? 'bg-blue-100' : 'bg-emerald-100'}`}>
+                      <div className={`h-full rounded-full transition-all duration-500 ${bulkProgress.status === 'applying' ? 'w-full animate-pulse bg-blue-500' : 'w-full bg-emerald-500'}`} />
+                    </div>
+                    <p className={`mt-2 text-xs ${bulkProgress.status === 'applying' ? 'text-blue-700' : 'text-emerald-700'}`}>{bulkProgress.status === 'applying' ? 'Please keep this page open while RefuseLink updates the community.' : `${bulkProgress.serviceName} service was successfully applied to every address.`}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {bulkRouteResult && !bulkProgress && <div className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">{bulkRouteResult}</div>}
             <div className="mt-4 grid gap-3 sm:grid-cols-[140px_1fr_130px_140px_130px_auto]">
               <select value={bulkRoute.service} disabled={Boolean(editingService)} onChange={(event) => setBulkRoute((current) => ({ ...current, service: event.target.value }))} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500">
                 <option value="trash">Trash</option><option value="recycling">Recycling</option><option value="yard_waste">Yard Waste</option>

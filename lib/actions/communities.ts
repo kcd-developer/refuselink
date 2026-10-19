@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db'
 import { getSession, getSessionUser } from '@/lib/session'
 import { createAuditLog } from '@/lib/audit'
+import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -88,7 +89,6 @@ export async function applyCommunityRouteAssignment(companySlug: string, communi
 
   const addresses = await prisma.address.findMany({ where: { companyId: user.companyId!, communityId }, select: { id: true } })
   if (!addresses.length) return { error: 'This community has no addresses' }
-  const addressIds = addresses.map((address) => address.id)
   const assignment = {
     ...parsed.data,
     route: companySlug === 'kc-disposal' ? parsed.data.route.toLocaleUpperCase() : parsed.data.route,
@@ -96,27 +96,36 @@ export async function applyCommunityRouteAssignment(companySlug: string, communi
   }
 
   try {
-    // Update existing assignments first, then create missing rows in small batches.
-    // Large interactive transactions can time out through Supabase's pooled connection.
-    await prisma.addressService.updateMany({
-      where: { addressId: { in: addressIds }, service: parsed.data.service },
-      data: { route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null },
-    })
+    // Let PostgreSQL perform the community-wide upsert in one statement. Issuing one
+    // Prisma operation per address is too slow through Supabase's pooled connection.
+    const assignedCount = await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "AddressService" (
+        "id", "addressId", "service", "route", "containerSize",
+        "dayOfWeek", "weekCycle", "createdAt", "updatedAt"
+      )
+      SELECT
+        gen_random_uuid()::text,
+        address."id",
+        ${assignment.service}::"ServiceType",
+        ${assignment.route},
+        ${assignment.containerSize},
+        ${assignment.dayOfWeek},
+        ${assignment.weekCycle ?? null}::"ServiceWeekCycle",
+        NOW(),
+        NOW()
+      FROM "Address" AS address
+      WHERE address."companyId" = ${user.companyId!}
+        AND address."communityId" = ${communityId}
+      ON CONFLICT ("addressId", "service") DO UPDATE SET
+        "route" = EXCLUDED."route",
+        "containerSize" = EXCLUDED."containerSize",
+        "dayOfWeek" = EXCLUDED."dayOfWeek",
+        "weekCycle" = EXCLUDED."weekCycle",
+        "updatedAt" = NOW()
+    `)
 
-    const batchSize = 50
-    for (let index = 0; index < addressIds.length; index += batchSize) {
-      const batch = addressIds.slice(index, index + batchSize)
-      await prisma.addressService.createMany({
-        data: batch.map((addressId) => ({ addressId, service: assignment.service, route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null })),
-        skipDuplicates: true,
-      })
-    }
-
-    const assignedCount = await prisma.addressService.count({
-      where: { addressId: { in: addressIds }, service: parsed.data.service },
-    })
-    if (assignedCount !== addressIds.length) {
-      return { error: `Service was assigned to ${assignedCount} of ${addressIds.length} addresses. Please try again to complete the remaining addresses.` }
+    if (assignedCount !== addresses.length) {
+      return { error: `Service was assigned to ${assignedCount} of ${addresses.length} addresses. Please try again to complete the remaining addresses.` }
     }
   } catch (error) {
     console.error('Community service assignment failed', { companySlug, communityId, service: parsed.data.service, error })
@@ -131,13 +140,13 @@ export async function applyCommunityRouteAssignment(companySlug: string, communi
     action: 'bulk_route_assignment',
     entityType: 'community',
     entityId: communityId,
-    metadata: { ...parsed.data, addressCount: addressIds.length },
+    metadata: { ...parsed.data, addressCount: addresses.length },
   })
   revalidatePath(`/${companySlug}/communities`)
   revalidatePath(`/${companySlug}/addresses`)
   revalidatePath(`/${companySlug}/my`)
   revalidatePath(`/${companySlug}/my/service-schedules`)
-  return { success: true, updated: addressIds.length }
+  return { success: true, updated: addresses.length }
 }
 
 export async function removeCommunityServiceAssignment(companySlug: string, communityId: string, service: unknown) {
