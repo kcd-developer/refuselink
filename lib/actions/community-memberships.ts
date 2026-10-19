@@ -16,11 +16,26 @@ const assignmentSchema = z.object({
   showPhone: z.boolean().default(true),
 })
 
-const managerSchema = assignmentSchema.omit({ customerUserId: true }).extend({
-  name: z.string().trim().min(1).max(200),
+const managerMembershipSchema = assignmentSchema.omit({ customerUserId: true }).extend({
   email: z.string().trim().toLowerCase().email().max(254),
-  phone: z.string().trim().max(30).optional().nullable(),
-  password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
+})
+
+const managerSchema = z.discriminatedUnion('accountMode', [
+  managerMembershipSchema.extend({
+    accountMode: z.literal('existing'),
+    customerUserId: z.string().min(1),
+  }),
+  managerMembershipSchema.extend({
+    accountMode: z.literal('new'),
+    name: z.string().trim().min(1).max(200),
+    phone: z.string().trim().max(30).optional().nullable(),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+  }),
+])
+
+const managerLookupSchema = z.object({
+  communityId: z.string().min(1),
+  email: z.string().trim().toLowerCase().email().max(254),
 })
 
 async function authorize(companySlug: string) {
@@ -32,6 +47,44 @@ async function authorize(companySlug: string) {
 
 function clean(value?: string | null) {
   return value?.trim() || null
+}
+
+export async function findCommunityManagerUser(companySlug: string, input: unknown) {
+  const employee = await authorize(companySlug)
+  if (!employee) return { error: 'Unauthorized' }
+  const parsed = managerLookupSchema.safeParse(input)
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Enter a valid email address' }
+
+  const community = await prisma.community.findFirst({
+    where: { id: parsed.data.communityId, companyId: employee.companyId! },
+    select: { id: true },
+  })
+  if (!community) return { error: 'Community not found' }
+
+  const customerUser = await prisma.customerUser.findUnique({
+    where: { email: parsed.data.email },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      isActive: true,
+      communityMemberships: {
+        where: { communityId: community.id, role: 'community_manager', isActive: true },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  })
+
+  if (!customerUser) return { found: false as const, email: parsed.data.email }
+  if (!customerUser.isActive) return { error: 'That RefuseLink account is inactive. Reactivate it before assigning community access.' }
+
+  return {
+    found: true as const,
+    customerUser: { id: customerUser.id, name: customerUser.name, email: customerUser.email, phone: customerUser.phone },
+    alreadyAssigned: customerUser.communityMemberships.length > 0,
+  }
 }
 
 export async function assignBoardMember(companySlug: string, input: unknown) {
@@ -86,9 +139,13 @@ export async function assignCommunityManager(companySlug: string, input: unknown
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid manager' }
   const data = parsed.data
 
-  let manager = await prisma.customerUser.findUnique({ where: { email: data.email } })
-  if (!manager) {
-    if (!data.password) return { error: 'A temporary password is required for a new manager' }
+  let manager
+  if (data.accountMode === 'existing') {
+    manager = await prisma.customerUser.findFirst({ where: { id: data.customerUserId, email: data.email, isActive: true } })
+    if (!manager) return { error: 'The selected account could not be verified. Search for the email again.' }
+  } else {
+    const existing = await prisma.customerUser.findUnique({ where: { email: data.email }, select: { id: true } })
+    if (existing) return { error: 'An account with this email now exists. Search for the email again before assigning access.' }
     manager = await prisma.customerUser.create({
       data: { name: data.name, email: data.email, phone: clean(data.phone), password: await bcrypt.hash(data.password, 12) },
     })

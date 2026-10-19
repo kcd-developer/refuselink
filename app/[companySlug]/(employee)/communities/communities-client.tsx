@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Building, Plus, Pencil, Printer, Trash2, UserPlus, X } from 'lucide-react'
+import { Building, CheckCircle2, Plus, Pencil, Printer, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { applyCommunityRouteAssignment, createCommunity, updateCommunity, deleteCommunity, removeCommunityServiceAssignment } from '@/lib/actions/communities'
-import { assignBoardMember, assignCommunityManager, removeCommunityMembership } from '@/lib/actions/community-memberships'
+import { assignBoardMember, assignCommunityManager, findCommunityManagerUser, removeCommunityMembership } from '@/lib/actions/community-memberships'
 import { colorForRoute, CommunityMap, type CommunityMapPoint } from '@/components/community-map'
 
 interface CommunityMembership { id: string; role: 'board_member' | 'community_manager'; positionTitle: string | null; publicEmail: string | null; publicPhone: string | null; showEmail: boolean; showPhone: boolean; customerUser: { id: string; name: string; email: string; phone: string | null } }
@@ -12,6 +12,9 @@ interface ServiceSummary { service: 'trash' | 'recycling' | 'yard_waste'; assign
 interface Community { id: string; name: string; cityId: string; city: { name: string; state: string }; addresses: CommunityMapPoint[]; memberships: CommunityMembership[]; serviceSummaries: ServiceSummary[]; _count: { customers: number; addresses: number } }
 interface City { id: string; name: string; state: string }
 interface ResidentAccess { customerUser: { id: string; name: string; email: string; phone: string | null }; customer: { communityId: string | null } }
+type ManagerLookup =
+  | { status: 'idle' | 'loading' | 'new' }
+  | { status: 'existing'; customerUser: { id: string; name: string; email: string; phone: string | null }; alreadyAssigned: boolean }
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export function CommunitiesClient({ communities, companySlug, cities, residentAccess }: { communities: Community[]; companySlug: string; cities: City[]; residentAccess: ResidentAccess[] }) {
@@ -30,6 +33,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
   const [residentUserId, setResidentUserId] = useState('')
   const [positionTitle, setPositionTitle] = useState('Board Member')
   const [manager, setManager] = useState({ name: '', email: '', phone: '', password: '', positionTitle: 'Community Manager' })
+  const [managerLookup, setManagerLookup] = useState<ManagerLookup>({ status: 'idle' })
   const [bulkRoute, setBulkRoute] = useState<{ service: string; route: string; containerSize: string; dayOfWeek: number; weekCycle: 'a' | 'b' | null }>({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1, weekCycle: null })
   const [bulkRouteError, setBulkRouteError] = useState('')
   const [bulkRouteResult, setBulkRouteResult] = useState('')
@@ -42,6 +46,11 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
     setBulkRoute({ service: 'trash', route: '', containerSize: '', dayOfWeek: 1, weekCycle: null })
     setBulkRouteError('')
     setBulkRouteResult('')
+  }
+  const resetManagerAssignment = () => {
+    setManager({ name: '', email: '', phone: '', password: '', positionTitle: 'Community Manager' })
+    setManagerLookup({ status: 'idle' })
+    setAssignmentError('')
   }
   const startEdit = (c: Community) => {
     setEditing(c); setName(c.name); setCityId(c.cityId); setShowForm(true); setError('')
@@ -97,15 +106,44 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
     setShowAssignment(null); setResidentUserId(''); setSelected(null); router.refresh()
   }
 
+  const handleManagerLookup = async () => {
+    if (!selected || !manager.email.trim()) return
+    setManagerLookup({ status: 'loading' }); setAssignmentError('')
+    const result = await findCommunityManagerUser(companySlug, { communityId: selected.id, email: manager.email })
+    if (result.error) { setManagerLookup({ status: 'idle' }); setAssignmentError(result.error); return }
+    if (result.found && result.customerUser) {
+      setManager((current) => ({ ...current, name: result.customerUser.name, email: result.customerUser.email, phone: result.customerUser.phone ?? '', password: '' }))
+      setManagerLookup({ status: 'existing', customerUser: result.customerUser, alreadyAssigned: Boolean(result.alreadyAssigned) })
+    } else {
+      setManager((current) => ({ ...current, name: '', phone: '', password: '' }))
+      setManagerLookup({ status: 'new' })
+    }
+  }
+
+  const handleManagerEmailChange = (email: string) => {
+    setManager((current) => ({ ...current, email }))
+    setManagerLookup({ status: 'idle' })
+    setAssignmentError('')
+  }
+
   const handleManagerAssignment = async () => {
     if (!selected) return
+    if (managerLookup.status !== 'existing' && managerLookup.status !== 'new') return
     setAssignmentLoading(true); setAssignmentError('')
+    const existingUserId = managerLookup.status === 'existing' ? managerLookup.customerUser.id : undefined
     const result = await assignCommunityManager(companySlug, {
-      communityId: selected.id, ...manager, publicEmail: manager.email, publicPhone: manager.phone, showEmail: true, showPhone: true,
+      communityId: selected.id,
+      accountMode: managerLookup.status === 'existing' ? 'existing' : 'new',
+      customerUserId: existingUserId,
+      ...manager,
+      publicEmail: manager.email,
+      publicPhone: manager.phone,
+      showEmail: true,
+      showPhone: true,
     })
     setAssignmentLoading(false)
     if (result.error) { setAssignmentError(result.error); return }
-    setShowAssignment(null); setManager({ name: '', email: '', phone: '', password: '', positionTitle: 'Community Manager' }); setSelected(null); router.refresh()
+    setShowAssignment(null); resetManagerAssignment(); setSelected(null); router.refresh()
   }
 
   const handleRemoveMembership = async (membershipId: string) => {
@@ -121,7 +159,15 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
     const serviceName = serviceLabels[bulkRoute.service as keyof typeof serviceLabels]
     if (!window.confirm(`Apply ${serviceName} route ${savedRoute} on ${dayNames[bulkRoute.dayOfWeek]} to all ${selected._count.addresses} addresses in ${selected.name}?`)) return
     setBulkRouteLoading(true); setBulkRouteError(''); setBulkRouteResult('')
-    const result = await applyCommunityRouteAssignment(companySlug, selected.id, { ...bulkRoute, route: savedRoute })
+    let result
+    try {
+      result = await applyCommunityRouteAssignment(companySlug, selected.id, { ...bulkRoute, route: savedRoute })
+    } catch (error) {
+      console.error(error)
+      setBulkRouteLoading(false)
+      setBulkRouteError('The service assignment did not finish. Please try again; retrying will not create duplicates.')
+      return
+    }
     setBulkRouteLoading(false)
     if (result.error) { setBulkRouteError(result.error); return }
     setBulkRouteResult(`Updated ${result.updated} addresses.`)
@@ -303,7 +349,7 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setShowAssignment('board'); setAssignmentError('') }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"><UserPlus className="h-4 w-4" /> Board Member</button>
-                <button onClick={() => { setShowAssignment('manager'); setAssignmentError('') }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"><UserPlus className="h-4 w-4" /> Community Manager</button>
+                <button onClick={() => { resetManagerAssignment(); setShowAssignment('manager') }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"><UserPlus className="h-4 w-4" /> Community Manager</button>
               </div>
             </div>
 
@@ -319,13 +365,42 @@ export function CommunitiesClient({ communities, companySlug, cities, residentAc
               </div>
             )}
             {showAssignment === 'manager' && (
-              <div className="mt-4 grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                <input value={manager.name} onChange={(event) => setManager((current) => ({ ...current, name: event.target.value }))} placeholder="Full Name" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                <input type="email" value={manager.email} onChange={(event) => setManager((current) => ({ ...current, email: event.target.value }))} placeholder="Email Address" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                <input value={manager.phone} onChange={(event) => setManager((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone Number" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                <input value={manager.positionTitle} onChange={(event) => setManager((current) => ({ ...current, positionTitle: event.target.value }))} placeholder="Position" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                <input type="password" value={manager.password} onChange={(event) => setManager((current) => ({ ...current, password: event.target.value }))} placeholder="Temporary Password (New Users)" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                <button onClick={handleManagerAssignment} disabled={!manager.name || !manager.email || assignmentLoading} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Assign Manager</button>
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="flex-1">
+                    <label htmlFor="manager-email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Manager email address</label>
+                    <input id="manager-email" type="email" value={manager.email} onChange={(event) => handleManagerEmailChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleManagerLookup() } }} placeholder="name@example.com" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                  </div>
+                  <button type="button" onClick={handleManagerLookup} disabled={!manager.email.trim() || managerLookup.status === 'loading'} className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"><Search className="h-4 w-4" /> {managerLookup.status === 'loading' ? 'Searching...' : 'Find User'}</button>
+                </div>
+
+                {managerLookup.status === 'idle' && <p className="mt-3 text-sm text-slate-500">Search first so an existing resident or manager keeps their current login and password.</p>}
+
+                {managerLookup.status === 'existing' && (
+                  <div className="mt-4">
+                    <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                      <div><p className="font-semibold text-emerald-950">Existing RefuseLink account found</p><p className="mt-1 text-sm text-emerald-900">{managerLookup.customerUser.name} · {managerLookup.customerUser.email}</p><p className="mt-1 text-xs leading-5 text-emerald-800">Their password and existing resident, board, or manager access will not change.</p>{managerLookup.alreadyAssigned && <p className="mt-2 text-xs font-semibold text-emerald-900">This user is already assigned as a manager of this community. Saving will update the membership details.</p>}</div>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                      <input value={manager.positionTitle} onChange={(event) => setManager((current) => ({ ...current, positionTitle: event.target.value }))} placeholder="Position (e.g., Community Manager)" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                      <button onClick={handleManagerAssignment} disabled={assignmentLoading} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{assignmentLoading ? 'Assigning...' : managerLookup.alreadyAssigned ? 'Update Manager' : 'Assign Manager'}</button>
+                    </div>
+                  </div>
+                )}
+
+                {managerLookup.status === 'new' && (
+                  <div className="mt-4">
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4"><p className="font-semibold text-blue-950">No RefuseLink account found</p><p className="mt-1 text-sm text-blue-900">Enter the new manager’s details. A new login will be created using the temporary password.</p></div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <input value={manager.name} onChange={(event) => setManager((current) => ({ ...current, name: event.target.value }))} placeholder="Full Name" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                      <input value={manager.phone} onChange={(event) => setManager((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone Number (optional)" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                      <input value={manager.positionTitle} onChange={(event) => setManager((current) => ({ ...current, positionTitle: event.target.value }))} placeholder="Position" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                      <input type="password" value={manager.password} onChange={(event) => setManager((current) => ({ ...current, password: event.target.value }))} placeholder="Temporary Password" className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                    </div>
+                    <div className="mt-3 flex justify-end"><button onClick={handleManagerAssignment} disabled={!manager.name.trim() || manager.password.length < 8 || assignmentLoading} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{assignmentLoading ? 'Creating...' : 'Create & Assign Manager'}</button></div>
+                  </div>
+                )}
               </div>
             )}
 

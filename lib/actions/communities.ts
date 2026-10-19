@@ -95,16 +95,33 @@ export async function applyCommunityRouteAssignment(companySlug: string, communi
     containerSize: normalizeContainerSize(parsed.data.containerSize),
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.addressService.updateMany({
+  try {
+    // Update existing assignments first, then create missing rows in small batches.
+    // Large interactive transactions can time out through Supabase's pooled connection.
+    await prisma.addressService.updateMany({
       where: { addressId: { in: addressIds }, service: parsed.data.service },
       data: { route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null },
     })
-    await tx.addressService.createMany({
-      data: addressIds.map((addressId) => ({ addressId, service: assignment.service, route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null })),
-      skipDuplicates: true,
+
+    const batchSize = 50
+    for (let index = 0; index < addressIds.length; index += batchSize) {
+      const batch = addressIds.slice(index, index + batchSize)
+      await prisma.addressService.createMany({
+        data: batch.map((addressId) => ({ addressId, service: assignment.service, route: assignment.route, containerSize: assignment.containerSize, dayOfWeek: assignment.dayOfWeek, weekCycle: assignment.weekCycle ?? null })),
+        skipDuplicates: true,
+      })
+    }
+
+    const assignedCount = await prisma.addressService.count({
+      where: { addressId: { in: addressIds }, service: parsed.data.service },
     })
-  }, { timeout: 30000 })
+    if (assignedCount !== addressIds.length) {
+      return { error: `Service was assigned to ${assignedCount} of ${addressIds.length} addresses. Please try again to complete the remaining addresses.` }
+    }
+  } catch (error) {
+    console.error('Community service assignment failed', { companySlug, communityId, service: parsed.data.service, error })
+    return { error: 'The service assignment could not be completed. No existing assignments were removed; please try again.' }
+  }
 
   await createAuditLog({
     companyId: user.companyId,
