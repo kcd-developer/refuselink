@@ -145,7 +145,7 @@ export function CustomerTicketDetailClient({ ticket, companySlug, companyName = 
                 <span className="text-sm font-medium text-slate-900">{msg.authorType === 'employee' ? companyName : msg.authorName}</span>
                 <span className="flex items-center gap-1 text-xs text-slate-400">
                   <Clock className="h-3 w-3" />
-                  {new Date(msg.createdAt).toLocaleString('en-US', { timeZone: 'UTC' })}
+                  {new Date(msg.createdAt).toLocaleString('en-US', { timeZone: 'America/Chicago', timeZoneName: 'short' })}
                 </span>
               </div>
               <p className="text-sm text-slate-700 whitespace-pre-wrap">{msg.content}</p>

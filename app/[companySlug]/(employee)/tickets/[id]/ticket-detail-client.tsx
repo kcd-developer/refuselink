@@ -141,7 +141,7 @@ export function TicketDetailClient({ ticket, employees, companySlug, currentUser
                       </span>
                     )}
                     <span className="text-xs text-slate-400 ml-auto">
-                      {msg?.createdAt ? new Date(msg.createdAt).toLocaleString('en-US', { timeZone: 'UTC' }) : ''}
+                      {msg?.createdAt ? new Date(msg.createdAt).toLocaleString('en-US', { timeZone: 'America/Chicago', timeZoneName: 'short' }) : ''}
                     </span>
                   </div>
                   <p className="text-sm text-slate-700 whitespace-pre-wrap pl-9">{msg?.content ?? ''}</p>
